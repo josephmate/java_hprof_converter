@@ -1,6 +1,12 @@
+# java binaries
+*.class
+
 # tmp files
 *~
 *.swp
+
+# heap dump files can be very large
+*.hprof
 
 # Compiled Object files
 *.slo
