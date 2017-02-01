@@ -24,7 +24,7 @@ The final step is to create a REPL that efficiently operates on the graph memory
       0     N byte null terminated string (including the null char)
       1     Will say: JAVA PROFILE 1.0.1
      ...    or        JAVA PROFILE 1.0.2
-      19    null terminating character
+      18    null terminating character
     \---/
     /---\
       20   4 Bytes describing how many bytes are used for identifiers

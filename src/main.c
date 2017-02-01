@@ -2,21 +2,23 @@
 //
 #include <stdio.h>
 
-#define SIZE_OF_HEADER 32
+#define SIZE_OF_HEADER 31
 #define TRUE 1
 
 void print_header(char * header);
 int print_tag(char tagType, FILE * f);
-int to_int(char * bytes);
+int from_little_endian_stream_to_int(char * data);
+int from_big_endian_stream_to_int(char * data);
 
 int main()
 {	
 	size_t numOfBytesRead;
 	FILE * f = stdin;
-	char buff[256];
+	char buff[SIZE_OF_HEADER];
+	char * buffPointer = &buff;
 
 	// read the header
-	numOfBytesRead = fread(buff, SIZE_OF_HEADER, 1, f);
+	numOfBytesRead = fread(buffPointer, SIZE_OF_HEADER, 1, f);
 	if (numOfBytesRead != 1) {
 		fprintf(stderr, "Was expecting the hprof binary file to contain at least %d bytes, but we were only able to read 0\n",
 			SIZE_OF_HEADER);
@@ -26,7 +28,7 @@ int main()
 
 	// read the tag until there are no more
 	while(TRUE) {
-		numOfBytesRead = fread(&buff, 1, 1, f);
+		numOfBytesRead = fread(buffPointer, 1, 1, f);
 		if (numOfBytesRead < 1) {
 			break;
 		}
@@ -52,39 +54,41 @@ void print_header(char * header) {
 
 #define TAG_HEADER_SIZE 8
 int print_tag(char tagType, FILE * f) {
-	char buff[256];
-	char * charPointer = &buff;
+	char buff[TAG_HEADER_SIZE];
+	char * buffPointer = &buff;
 	size_t numOfBytesRead;
 	fprintf(stdout, "tag type: %d\n", (int)tagType);  fflush(stdout);
 
 	numOfBytesRead = fread(buff, TAG_HEADER_SIZE, 1, f);
 	if (numOfBytesRead != 1) {
 		fprintf(stderr,
-			"Was reading tag header. expected %d bytes, but failed but was 0\n",
-			TAG_HEADER_SIZE
+			"Was reading tag header. expected %d bytes, but was %d\n",
+			TAG_HEADER_SIZE, numOfBytesRead
 		);
 	}
-	int microsSince = (int)(*charPointer);
+	int microsSince = from_big_endian_stream_to_int(buffPointer);
 	fprintf(stdout, "micros since start: %d\n", microsSince); fflush(stdout);
-	charPointer += 4;
-	int dataLength = (int)(*charPointer);
+	int dataLength = from_big_endian_stream_to_int(buffPointer +4);
 	fprintf(stdout, "data length: %d\n", dataLength); fflush(stdout);
 
 	for (int i = 0; i < dataLength; i++) {
-		numOfBytesRead = fread(buff, 1, 1, f);
+		numOfBytesRead = fread(buffPointer, 1, 1, f);
 		if (numOfBytesRead != 1) {
 			fprintf(stderr,
-				"Was reading entry. expected %d bytes, but failed on %d\n",
+				"Was reading data of tag entry. expected %d bytes, but failed on %d\n",
 				dataLength, i
 			);
+			perror("The following error occurred");
 			return -1;
 		}
 	}
+	return 0;
 }
 
-
-int to_int(char * bytes) {
-	char result[2];
-	result[0] = bytes[1];
-	return 0;
+// http://stackoverflow.com/questions/105252/how-do-i-convert-between-big-endian-and-little-endian-values-in-c
+int from_little_endian_stream_to_int(char * data) {
+	return  (data[0] << 0) | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+}
+int from_big_endian_stream_to_int(char * data) {
+	return  (data[3] << 0) | (data[2] << 8) | (data[1] << 16) | (data[0] << 24);
 }
