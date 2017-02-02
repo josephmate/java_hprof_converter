@@ -21,6 +21,7 @@ src/x64/
 *.vcxproj.user
 *.vc.db
 *.db
+*.opendb
 
 # java binaries
 *.class
