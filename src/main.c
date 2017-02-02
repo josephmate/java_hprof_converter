@@ -1,6 +1,9 @@
 // ConsoleApplication1.cpp : Defines the entry point for the console application.
 //
 #include <stdio.h>
+#ifdef _WIN32
+#include <fcntl.h>  
+#endif
 
 #define SIZE_OF_HEADER 31
 #define TRUE 1
@@ -16,6 +19,15 @@ int main()
 	FILE * f = stdin;
 	char buff[SIZE_OF_HEADER];
 	char * buffPointer = &buff;
+
+#ifdef _WIN32
+	int result = _setmode(_fileno(stdin), _O_BINARY);
+	if (result == -1)
+		perror("Cannot set mode");
+	else
+		printf("'stdin' successfully changed to binary mode\n");
+#endif
+
 
 	// read the header
 	numOfBytesRead = fread(buffPointer, SIZE_OF_HEADER, 1, f);
@@ -46,7 +58,7 @@ int main()
 }
 
 /**
- * header is a 32 byte array containing the header data
+ * header is a 31 byte array containing the header data
  */
 void print_header(char * header) {
 
@@ -78,7 +90,7 @@ int print_tag(char tagType, FILE * f) {
 				"Was reading data of tag entry. expected %d bytes, but failed on %d\n",
 				dataLength, i
 			);
-			perror("The following error occurred");
+			perror("The following error occurred:");
 			return -1;
 		}
 	}
