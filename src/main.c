@@ -66,8 +66,8 @@ void print_header(char * header) {
 
 #define TAG_HEADER_SIZE 8
 int print_tag(char tagType, FILE * f) {
-	char buff[TAG_HEADER_SIZE];
-	char * buffPointer = &buff;
+	unsigned char buff[TAG_HEADER_SIZE];
+	unsigned char * buffPointer = &buff;
 	size_t numOfBytesRead;
 	fprintf(stdout, "tag type: %d\n", (int)tagType);  fflush(stdout);
 
@@ -78,6 +78,12 @@ int print_tag(char tagType, FILE * f) {
 			TAG_HEADER_SIZE, numOfBytesRead
 		);
 	}
+	fprintf(stdout, "char array: %d %d %d %d         %d %d %d %d\n",
+		buff[0], buff[1], buff[2], buff[3],
+		buff[4], buff[5], buff[6], buff[7]
+	);
+	fflush(stdout);
+
 	int microsSince = from_big_endian_stream_to_int(buffPointer);
 	fprintf(stdout, "micros since start: %d\n", microsSince); fflush(stdout);
 	int dataLength = from_big_endian_stream_to_int(buffPointer +4);
@@ -98,9 +104,9 @@ int print_tag(char tagType, FILE * f) {
 }
 
 // http://stackoverflow.com/questions/105252/how-do-i-convert-between-big-endian-and-little-endian-values-in-c
-int from_little_endian_stream_to_int(char * data) {
+int from_little_endian_stream_to_int(unsigned char * data) {
 	return  (data[0] << 0) | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
 }
-int from_big_endian_stream_to_int(char * data) {
+int from_big_endian_stream_to_int(unsigned char * data) {
 	return  (data[3] << 0) | (data[2] << 8) | (data[1] << 16) | (data[0] << 24);
 }
