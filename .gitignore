@@ -1,3 +1,28 @@
+# visual studio tmp files
+x64/
+src/x64/
+.vs/
+*.aps
+*.exe
+*.idb
+*.ipch
+*.lastbuildstate
+*.lib
+*.log
+*.manifest
+*.obj
+*.pch
+*.pdb
+*.res
+*.sdf
+*.suo
+*.tlog
+*.vcxproj.filters
+*.vcxproj.user
+*.vc.db
+*.db
+*.opendb
+
 # java binaries
 *.class
 

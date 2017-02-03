@@ -19,6 +19,58 @@ The final step is to create a REPL that efficiently operates on the graph memory
 
 # Specification
 
-The most recent version is available at: https://blogs.oracle.com/kto/resource/manual.html#mozTocId848088
+    Byte Number Description
+    /---\ 
+      0     N byte null terminated string (including the null char)
+      1     Will say: JAVA PROFILE 1.0.1
+     ...    or        JAVA PROFILE 1.0.2
+      18    null terminating character
+    \---/
+    /---\
+      20   4 Bytes describing how many bytes are used for identifiers
+      21   is this usually 4 ie 00 00 00 04 ?
+      22
+      23
+    \---/
+    /---\
+      24  highest 4 bytes of the long millseconds since epoch
+      25   
+      26
+      27
+    \---/
+    /---\
+      28  lowest 4 bytes of the long millseconds since epoch
+      29   
+      30
+      31
+    \---/
+
+    /-----\
+     /---\
+        0     byte describing the type of the record
+     \---/
+     /---\
+        1     microseconds since timestamp in header
+        2
+        3
+        4
+     \---/
+     /---\
+        1     this number, N, represents the number of bytes to follow
+        2
+        3
+        4
+     \---/
+     /---\
+       0
+      ...
+      N-1
+     \---/
+    
 
 
+
+The most recent version is available at:
+
+* https://blogs.oracle.com/kto/resource/manual.html#mozTocId848088
+* https://java.net/downloads/heap-snapshot/hprof-binary-format.html
