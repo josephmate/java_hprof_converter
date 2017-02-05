@@ -146,6 +146,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c" />
+    <ClCompile Include="StreamUtil.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="StreamUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

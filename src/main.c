@@ -1,21 +1,20 @@
 // ConsoleApplication1.cpp : Defines the entry point for the console application.
 //
 #include <stdio.h>
+#include <stdlib.h>
 #ifdef _WIN32
 #include <fcntl.h>  
+#include <io.h> 
 #endif
+#include "StreamUtil.h"
 
 #define SIZE_OF_HEADER 31
 #define TRUE 1
 
 int printHeader(unsigned char * header, int* sizeOfId);
-int posnOfNull(char * str, int maxLen);
-int printTag(unsigned char tagType, FILE * f);
-unsigned int fromLittleEndianStreamToInt(unsigned char * data);
-unsigned int fromBigEndianStreamToInt(unsigned char * data);
-int iterateThroughStream(FILE* f, int dataLength);
-int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength);
-int processTagString(FILE * f, int dataLength);
+int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength, int idSize);
+int printTag(unsigned char tagType, FILE * f, int idSize);
+int processTagString(FILE * f, int dataLength, int idSize);
 int processTagLoadClass(FILE * f, int dataLength);
 int processTagUnloadClass(FILE * f, int dataLength);
 int processTagStackFrame(FILE * f, int dataLength);
@@ -35,7 +34,7 @@ int main()
 	size_t numOfBytesRead;
 	FILE * f = stdin;
 	char buff[SIZE_OF_HEADER];
-	char * buffPointer = &buff;
+	char * buffPointer = buff;
 
 #ifdef _WIN32
 	int result = _setmode(_fileno(stdin), _O_BINARY);
@@ -63,7 +62,7 @@ int main()
 			break;
 		}
 
-		int tagErrorCode = printTag(buff[0], f);
+		int tagErrorCode = printTag(buff[0], f, idSize);
 		if (tagErrorCode != 0) {
 			return tagErrorCode;
 		}
@@ -107,20 +106,11 @@ int printHeader(unsigned char * header, int* idSize) {
 	return 0;
 }
 
-int posnOfNull(unsigned char * str, int maxLen) {
-	for (int i = 0; i < maxLen; i++) { //only checking 31-12 characters because we need the long and the size of id
-		if (str[i] == '\0') {
-			return i;
-		}
-	}
-	return -1;
-}
-
 
 #define TAG_HEADER_SIZE 8
-int printTag(unsigned char tagType, FILE * f) {
+int printTag(unsigned char tagType, FILE * f, int idSize) {
 	unsigned char buff[TAG_HEADER_SIZE];
-	unsigned char * buffPointer = &buff;
+	unsigned char * buffPointer = buff;
 	size_t chunksRead;
 	fprintf(stdout, "tag type: %d\n", (int)tagType);
 
@@ -128,7 +118,7 @@ int printTag(unsigned char tagType, FILE * f) {
 	if (chunksRead != 1) {
 		fprintf(stderr,
 			"Was reading tag header. expected %d bytes, but was %d\n",
-			TAG_HEADER_SIZE, chunksRead
+			TAG_HEADER_SIZE, (int)chunksRead
 		);
 	}
 	fprintf(stdout, "char array: %d %d %d %d         %d %d %d %d\n",
@@ -141,7 +131,7 @@ int printTag(unsigned char tagType, FILE * f) {
 	unsigned int dataLength = fromBigEndianStreamToInt(buffPointer +4);
 	fprintf(stdout, "data length: %d\n", dataLength);
 	
-	return selectAndProcessTag(tagType, f, dataLength);
+	return selectAndProcessTag(tagType, f, dataLength, idSize);
 }
 
 
@@ -159,11 +149,11 @@ int printTag(unsigned char tagType, FILE * f) {
 #define TAG_HEAP_DUMP_END     0x2C
 #define TAG_CPU_SAMPLES       0xD
 #define TAG_CONTROL_SETTINGS  0xE
-int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength) {
+int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength, int idSize) {
 	switch (tagType)
 	{
 	case TAG_STRING:
-		return processTagString(f, dataLength);
+		return processTagString(f, dataLength, idSize);
 	case TAG_LOAD_CLASS:
 		return processTagLoadClass(f, dataLength);
 	case TAG_UNLOAD_CLASS:
@@ -200,10 +190,25 @@ int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength) {
  * ID ID for this string
  * [u1]* UTF8 characters for string (NOT NULL terminated)
  */
-int processTagString(FILE * f, int dataLength) {
+int processTagString(FILE * f, int dataLength, int idSize) {
 	fprintf(stdout, "TAG_STRING\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	unsigned long long id;
+	if (getId(f, idSize, &id) != 0) {
+		return -1;
+	}
+	fprintf(stdout, "id: %lld\n", id);
+	// idSize less because we already read idSize bytes from the stream
+	// +1 because we need a null character at the end
+	int strLen = dataLength - idSize + 1;
+	char * str = malloc(sizeof(char)*strLen);
+	str[strLen - 1] = '\0';
+	//one less because last char is the null character
+	if (fread(str, strLen - 1, 1, f) != 1) {
+		fprintf(stderr, "expected to read %d bytes for TAG_STRING's string, but failed\n", strLen - 1);
+	}
+	fprintf(stdout, "str: %s\n", str);
+	free(str);
+	return 0;
 }
 
 /**
@@ -368,33 +373,4 @@ int processTagControlSettings(FILE * f, int dataLength) {
 	fprintf(stdout, "TAG_CONTROL_SETTINGS\n");
 	// TODO
 	return iterateThroughStream(f, dataLength);
-}
-
-/**
- * Iterates through dataLength bytes of the stream: f.
- */
-int iterateThroughStream(FILE* f, int dataLength) {
-	unsigned char buff[1];
-	unsigned char * buffPointer = &buff;
-	size_t numOfBytesRead;
-	for (int i = 0; i < dataLength; i++) {
-		numOfBytesRead = fread(buffPointer, 1, 1, f);
-		if (numOfBytesRead != 1) {
-			fprintf(stderr,
-				"Was reading data of tag entry. expected %d bytes, but failed on %d\n",
-				dataLength, i
-			);
-			perror("The following error occurred:");
-			return -1;
-		}
-	}
-	return 0;
-}
-
-// http://stackoverflow.com/questions/105252/how-do-i-convert-between-big-endian-and-little-endian-values-in-c
-unsigned int fromLittleEndianStreamToInt(unsigned char * data) {
-	return  (data[0] << 0) | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-}
-unsigned int fromBigEndianStreamToInt(unsigned char * data) {
-	return  (data[3] << 0) | (data[2] << 8) | (data[1] << 16) | (data[0] << 24);
 }
