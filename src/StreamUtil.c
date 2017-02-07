@@ -22,6 +22,16 @@ unsigned long long fromBigWordSmallWordBigEndianWords(unsigned char * data) {
 	        | ((unsigned long long)data[7] <<  0) | ((unsigned long long)data[6] <<  8) | ((unsigned long long)data[5] << 16) | ((unsigned long long)data[4] << 24);
 }
 
+int readBigEndianStreamToInt(FILE * f, unsigned int * result) {
+	char buff[4];
+	size_t chunksRead = fread(buff, 4, 1, f);
+	if (chunksRead != 1) {
+		fprintf(stderr, "was unable to read a chunk of 4 bytes from the stream\n");
+		return -1;
+	}
+	return 0;
+}
+
 
 /**
 * Iterates through dataLength bytes of the stream: f.

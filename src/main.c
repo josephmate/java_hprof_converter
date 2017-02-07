@@ -11,11 +11,21 @@
 #define SIZE_OF_HEADER 31
 #define TRUE 1
 
+/* Contains all the info necessary for tag processing */
+struct TagInfo {
+	FILE * stream;
+	int dataLength;
+	int idSize;
+};
+typedef struct TagInfo TagInfo;
+
+
 int printHeader(unsigned char * header, int* sizeOfId);
-int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength, int idSize);
 int printTag(unsigned char tagType, FILE * f, int idSize);
-int processTagString(FILE * f, int dataLength, int idSize);
-int processTagLoadClass(FILE * f, int dataLength);
+TagInfo makeTagInfo(FILE * f, int dataLength, int idSize);
+int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo);
+int processTagString(TagInfo tagInfo);
+int processTagLoadClass(TagInfo tagInfo);
 int processTagUnloadClass(FILE * f, int dataLength);
 int processTagStackFrame(FILE * f, int dataLength);
 int processTagStackTrace(FILE * f, int dataLength);
@@ -131,7 +141,16 @@ int printTag(unsigned char tagType, FILE * f, int idSize) {
 	unsigned int dataLength = fromBigEndianStreamToInt(buffPointer +4);
 	fprintf(stdout, "data length: %d\n", dataLength);
 	
-	return selectAndProcessTag(tagType, f, dataLength, idSize);
+	return selectAndProcessTag(tagType, makeTagInfo(f, dataLength, idSize));
+} 
+
+TagInfo makeTagInfo(FILE * f, int dataLength, int idSize)
+{
+	TagInfo res;
+	res.stream = f;
+	res.dataLength = dataLength;
+	res.idSize = idSize;
+	return res;
 }
 
 
@@ -149,40 +168,40 @@ int printTag(unsigned char tagType, FILE * f, int idSize) {
 #define TAG_HEAP_DUMP_END     0x2C
 #define TAG_CPU_SAMPLES       0xD
 #define TAG_CONTROL_SETTINGS  0xE
-int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength, int idSize) {
+int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	switch (tagType)
 	{
 	case TAG_STRING:
-		return processTagString(f, dataLength, idSize);
+		return processTagString(tagInfo);
 	case TAG_LOAD_CLASS:
-		return processTagLoadClass(f, dataLength);
+		return processTagLoadClass(tagInfo);
 	case TAG_UNLOAD_CLASS:
-		return processTagUnloadClass(f, dataLength);
+		return processTagUnloadClass(tagInfo.stream, tagInfo.dataLength);
 	case TAG_STACK_FRAME:
-		return processTagStackFrame(f, dataLength);
+		return processTagStackFrame(tagInfo.stream, tagInfo.dataLength);
 	case TAG_STACK_TRACE:
-		return processTagStackTrace(f, dataLength);
+		return processTagStackTrace(tagInfo.stream, tagInfo.dataLength);
 	case TAG_ALLOC_SITES:
-		return processTagAllocSites(f, dataLength);
+		return processTagAllocSites(tagInfo.stream, tagInfo.dataLength);
 	case TAG_HEAP_SUMMARY:
-		return processTagHeapSummary(f, dataLength);
+		return processTagHeapSummary(tagInfo.stream, tagInfo.dataLength);
 	case TAG_START_THREAD:
-		return processTagStartThread(f, dataLength);
+		return processTagStartThread(tagInfo.stream, tagInfo.dataLength);
 	case TAG_END_THREAD:
-		return processTagEndThread(f, dataLength);
+		return processTagEndThread(tagInfo.stream, tagInfo.dataLength);
 	case TAG_HEAP_DUMP:
-		return processTagHeapDump(f, dataLength);
+		return processTagHeapDump(tagInfo.stream, tagInfo.dataLength);
 	case TAG_HEAP_DUMP_SEGMENT:
-		return processTagHeapSegment(f, dataLength);
+		return processTagHeapSegment(tagInfo.stream, tagInfo.dataLength);
 	case TAG_HEAP_DUMP_END:
-		return processTagHeapDumpEnd(f, dataLength);
+		return processTagHeapDumpEnd(tagInfo.stream, tagInfo.dataLength);
 	case TAG_CPU_SAMPLES:
-		return processTagCpuSamples(f, dataLength);
+		return processTagCpuSamples(tagInfo.stream, tagInfo.dataLength);
 	case TAG_CONTROL_SETTINGS:
-		return processTagControlSettings(f, dataLength);
+		return processTagControlSettings(tagInfo.stream, tagInfo.dataLength);
 	default:
 		fprintf(stdout, "tag not recognized or implemented: %d", tagType);
-		return iterateThroughStream(f, dataLength);
+		return iterateThroughStream(tagInfo.stream, tagInfo.dataLength);
 	}
 }
 
@@ -190,20 +209,20 @@ int selectAndProcessTag(unsigned char tagType, FILE * f, int dataLength, int idS
  * ID ID for this string
  * [u1]* UTF8 characters for string (NOT NULL terminated)
  */
-int processTagString(FILE * f, int dataLength, int idSize) {
+int processTagString(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_STRING\n");
 	unsigned long long id;
-	if (getId(f, idSize, &id) != 0) {
+	if (getId(tagInfo.stream, tagInfo.idSize, &id) != 0) {
 		return -1;
 	}
 	fprintf(stdout, "id: %lld\n", id);
 	// idSize less because we already read idSize bytes from the stream
 	// +1 because we need a null character at the end
-	int strLen = dataLength - idSize + 1;
+	int strLen = tagInfo.dataLength - tagInfo.idSize + 1;
 	char * str = malloc(sizeof(char)*strLen);
 	str[strLen - 1] = '\0';
 	//one less because last char is the null character
-	if (fread(str, strLen - 1, 1, f) != 1) {
+	if (fread(str, strLen - 1, 1, tagInfo.stream) != 1) {
 		fprintf(stderr, "expected to read %d bytes for TAG_STRING's string, but failed\n", strLen - 1);
 	}
 	fprintf(stdout, "str: %s\n", str);
@@ -217,10 +236,41 @@ int processTagString(FILE * f, int dataLength, int idSize) {
  * u4 stack trace serial number
  * ID class name string ID
  */
-int processTagLoadClass(FILE * f, int dataLength) {
+int processTagLoadClass(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_LOAD_CLASS\n"); 
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
+	if (tagInfo.dataLength < totalRequiredBytes) {
+		fprintf(stderr, "TAG_LOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+	}
+
+	int classSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &classSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 class serial number for TAG_LOAD_CLASS\n");
+		return -1;
+	}
+
+	unsigned long long classObjId;
+	if (getId(tagInfo.stream, tagInfo.idSize, &classObjId) != 0) {
+		return -1;
+	}
+
+	int stackTraceSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 class serial number for TAG_LOAD_CLASS\n");
+		return -1;
+	}
+
+	unsigned long long classNameStringId;
+	if (getId(tagInfo.stream, tagInfo.idSize, &classNameStringId) != 0) {
+		return -1;
+	}
+
+	fprintf(stdout, "classSerialNumber: %d\n", classSerialNumber);
+	fprintf(stdout, "classObjId: %lld\n", classObjId);
+	fprintf(stdout, "stackTraceSerialNumber: %d\n", stackTraceSerialNumber);
+	fprintf(stdout, "classNameStringId: %lld\n", classNameStringId);
+
+	return 0;
 }
 
 /**
