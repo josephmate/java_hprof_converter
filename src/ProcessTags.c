@@ -4,6 +4,8 @@
 #include "StreamUtil.h"
 #include <stdlib.h>
 
+int processTagStackTraceFrame(TagInfo tagInfo);
+
 #define TAG_STRING            0x1
 #define TAG_LOAD_CLASS        0x2
 #define TAG_UNLOAD_CLASS      0x3
@@ -30,7 +32,7 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	case TAG_STACK_FRAME:
 		return processTagStackFrame(tagInfo);
 	case TAG_STACK_TRACE:
-		return processTagStackTrace(tagInfo.stream, tagInfo.dataLength);
+		return processTagStackTrace(tagInfo);
 	case TAG_ALLOC_SITES:
 		return processTagAllocSites(tagInfo.stream, tagInfo.dataLength);
 	case TAG_HEAP_SUMMARY:
@@ -225,10 +227,57 @@ int processTagStackFrame(TagInfo tagInfo) {
 * u4 number of frames
 * [ID]* series of stack frame ID's
 */
-int processTagStackTrace(FILE * f, int dataLength) {
+int processTagStackTrace(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_STACK_TRACE\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	int totalRequiredBytes = 3 * 4;
+	if (tagInfo.dataLength != totalRequiredBytes) {
+		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+	}
+
+	unsigned int stackTraceSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 stackTraceSerialNumber for TAG_STACK_FRAME\n");
+		return -1;
+	}
+	unsigned int threadSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &threadSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 threadSerialNumber for TAG_STACK_FRAME\n");
+		return -1;
+	}
+	unsigned int numberOfFrames;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfFrames) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfFrames for TAG_STACK_FRAME\n");
+		return -1;
+	}
+
+	fprintf(stdout, "stackTraceSerialNumber:       %d\n", stackTraceSerialNumber);
+	fprintf(stdout, "threadSerialNumber:       %d\n", threadSerialNumber);
+
+	int dataLeft = tagInfo.dataLength - totalRequiredBytes;
+	if (dataLeft != numberOfFrames * tagInfo.idSize) {
+		fprintf(stderr, "TAG_STACK_TRACE required %d bytes for frames but we only got %d.\n", totalRequiredBytes, dataLeft);
+	}
+
+	
+	for (unsigned int i = 0; i < numberOfFrames; i++) {
+		int errCode = processTagStackTraceFrame(tagInfo);
+		if (errCode  != 0) {
+			fprintf(stderr, "TAG_STACK_TRACE failed on %d th stack trace frame\n", i);
+			return errCode;
+		}
+	}
+
+	return 0;
+}
+
+int processTagStackTraceFrame(TagInfo tagInfo) {
+	unsigned long long stackFrameId;
+	if (getId(tagInfo.stream, tagInfo.idSize, &stackFrameId) != 0) {
+		fprintf(stderr, "unable to read %d bytes stackFrameId for TAG_STACK_FRAME\n", tagInfo.idSize);
+		return -1;
+	}
+	fprintf(stdout, "stackFrameId:  %lld\n", stackFrameId);
+	return 0;
 }
 
 /**
