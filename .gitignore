@@ -22,6 +22,7 @@ src/x64/
 *.vc.db
 *.db
 *.opendb
+*.TMP
 
 # java binaries
 *.class

@@ -146,6 +146,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c" />
+    <ClCompile Include="ProcessTags.c" />
+    <ClCompile Include="TagInfo.c" />
+    <ClCompile Include="StreamUtil.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ProcessTags.h" />
+    <ClInclude Include="StreamUtil.h" />
+    <ClInclude Include="TagInfo.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,7 +9,7 @@
 int main()
 {
 	char buff;
-	int numOfBytesRead;
+	size_t numOfBytesRead;
 	int dataLen = 0;
 
     #ifdef _WIN32
