@@ -1,5 +1,5 @@
-#ifndef STREAMUTIL_H
-#define STREAMUTIL_H
+#ifndef STREAM_UTIL_H
+#define STREAM_UTIL_H
 
 #include <stdio.h>
 
