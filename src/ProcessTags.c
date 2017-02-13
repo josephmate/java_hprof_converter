@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 int processTagStackTraceFrame(TagInfo tagInfo);
+int processTagCpuSampleTrace(TagInfo tagInfo);
 
 #define TAG_STRING            0x1
 #define TAG_LOAD_CLASS        0x2
@@ -48,7 +49,7 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	case TAG_HEAP_DUMP_END:
 		return processTagHeapDumpEnd(tagInfo);
 	case TAG_CPU_SAMPLES:
-		return processTagCpuSamples(tagInfo.stream, tagInfo.dataLength);
+		return processTagCpuSamples(tagInfo);
 	case TAG_CONTROL_SETTINGS:
 		return processTagControlSettings(tagInfo);
 	default:
@@ -230,8 +231,9 @@ int processTagStackFrame(TagInfo tagInfo) {
 int processTagStackTrace(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_STACK_TRACE\n");
 	int totalRequiredBytes = 3 * 4;
-	if (tagInfo.dataLength != totalRequiredBytes) {
+	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		return -1;
 	}
 
 	unsigned int stackTraceSerialNumber;
@@ -250,7 +252,7 @@ int processTagStackTrace(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "stackTraceSerialNumber:       %d\n", stackTraceSerialNumber);
+	fprintf(stdout, "stackTraceSerialNumber:   %d\n", stackTraceSerialNumber);
 	fprintf(stdout, "threadSerialNumber:       %d\n", threadSerialNumber);
 
 	int dataLeft = tagInfo.dataLength - totalRequiredBytes;
@@ -467,15 +469,69 @@ int processTagHeapDumpEnd(TagInfo tagInfo) {
 /**
 u4 total number of samples
 u4 number of traces that follow:
-for each
+  for each
+    u4 number of samples
+    u4 stack trace serial number
+*/
+int processTagCpuSamples(TagInfo tagInfo) {
+	fprintf(stdout, "TAG_CPU_SAMPLES\n");
+	int totalRequiredBytes = 2*4;
+	if (tagInfo.dataLength >= totalRequiredBytes) {
+		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+	}
+	
+	unsigned int numberOfSamples;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfSamples) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfSamples for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+	unsigned int numberOfTraces;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfTraces) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfTraces for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+
+	int bytesLeft = tagInfo.dataLength - totalRequiredBytes;
+	if (bytesLeft != 4 * 2 * numberOfTraces) {
+		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes for %d numberOfTraces but we got %d.\n", 4 * 2 * numberOfTraces, numberOfTraces, bytesLeft);
+	}
+
+	fprintf(stdout, "numberOfSamples:      %d\n", numberOfSamples);
+
+	for (unsigned int i = 0; i < numberOfTraces; i++) {
+		int errorCode = processTagCpuSampleTrace(tagInfo);
+		if (errorCode != 0) {
+			fprintf(stderr, "could not get %d th trace for TAG_CPU_SAMPLES\n", i);
+			return errorCode;
+		}
+	}
+
+	return 0;
+}
+
+/*
 u4 number of samples
 u4 stack trace serial number
 */
-int processTagCpuSamples(FILE * f, int dataLength) {
-	fprintf(stdout, "TAG_CPU_SAMPLES\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+int processTagCpuSampleTrace(TagInfo tagInfo) {
+	unsigned int numberOfSamples;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfSamples) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfSamples for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+	unsigned int stackTraceSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 stackTraceSerialNumber for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+
+	fprintf(stdout, "numberOfSamples:        %d\n", numberOfSamples);
+	fprintf(stdout, "stackTraceSerialNumber: %d\n", stackTraceSerialNumber);
+
+
+	return 0;
 }
+
 
 /**
 u4 Bit mask flags:

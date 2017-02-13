@@ -17,7 +17,7 @@ int processTagEndThread(TagInfo tagInfo);
 int processTagHeapDump(FILE * f, int dataLength);
 int processTagHeapSegment(FILE * f, int dataLength);
 int processTagHeapDumpEnd(TagInfo tagInfo);
-int processTagCpuSamples(FILE * f, int dataLength);
+int processTagCpuSamples(TagInfo tagInfo);
 int processTagControlSettings(TagInfo tagInfo);
 
 #endif
