@@ -10,7 +10,7 @@ int processTagLoadClass(TagInfo tagInfo);
 int processTagUnloadClass(TagInfo tagInfo);
 int processTagStackFrame(TagInfo tagInfo);
 int processTagStackTrace(TagInfo tagInfo);
-int processTagAllocSites(FILE * f, int dataLength);
+int processTagAllocSites(TagInfo tagInfo);
 int processTagHeapSummary(TagInfo tagInfo);
 int processTagStartThread(TagInfo tagInfo);
 int processTagEndThread(TagInfo tagInfo);
