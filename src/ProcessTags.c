@@ -4,6 +4,10 @@
 #include "StreamUtil.h"
 #include <stdlib.h>
 
+int processTagStackTraceFrame(TagInfo tagInfo);
+int processTagCpuSampleTrace(TagInfo tagInfo);
+int processATagAllocSite(TagInfo tagInfo);
+
 #define TAG_STRING            0x1
 #define TAG_LOAD_CLASS        0x2
 #define TAG_UNLOAD_CLASS      0x3
@@ -30,9 +34,9 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	case TAG_STACK_FRAME:
 		return processTagStackFrame(tagInfo);
 	case TAG_STACK_TRACE:
-		return processTagStackTrace(tagInfo.stream, tagInfo.dataLength);
+		return processTagStackTrace(tagInfo);
 	case TAG_ALLOC_SITES:
-		return processTagAllocSites(tagInfo.stream, tagInfo.dataLength);
+		return processTagAllocSites(tagInfo);
 	case TAG_HEAP_SUMMARY:
 		return processTagHeapSummary(tagInfo);
 	case TAG_START_THREAD:
@@ -46,7 +50,7 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	case TAG_HEAP_DUMP_END:
 		return processTagHeapDumpEnd(tagInfo);
 	case TAG_CPU_SAMPLES:
-		return processTagCpuSamples(tagInfo.stream, tagInfo.dataLength);
+		return processTagCpuSamples(tagInfo);
 	case TAG_CONTROL_SETTINGS:
 		return processTagControlSettings(tagInfo);
 	default:
@@ -225,10 +229,58 @@ int processTagStackFrame(TagInfo tagInfo) {
 * u4 number of frames
 * [ID]* series of stack frame ID's
 */
-int processTagStackTrace(FILE * f, int dataLength) {
+int processTagStackTrace(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_STACK_TRACE\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	int totalRequiredBytes = 3 * 4;
+	if (tagInfo.dataLength < totalRequiredBytes) {
+		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		return -1;
+	}
+
+	unsigned int stackTraceSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 stackTraceSerialNumber for TAG_STACK_FRAME\n");
+		return -1;
+	}
+	unsigned int threadSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &threadSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 threadSerialNumber for TAG_STACK_FRAME\n");
+		return -1;
+	}
+	unsigned int numberOfFrames;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfFrames) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfFrames for TAG_STACK_FRAME\n");
+		return -1;
+	}
+
+	fprintf(stdout, "stackTraceSerialNumber:   %d\n", stackTraceSerialNumber);
+	fprintf(stdout, "threadSerialNumber:       %d\n", threadSerialNumber);
+
+	int dataLeft = tagInfo.dataLength - totalRequiredBytes;
+	if (dataLeft != numberOfFrames * tagInfo.idSize) {
+		fprintf(stderr, "TAG_STACK_TRACE required %d bytes for frames but we only got %d.\n", totalRequiredBytes, dataLeft);
+	}
+
+	
+	for (unsigned int i = 0; i < numberOfFrames; i++) {
+		int errCode = processTagStackTraceFrame(tagInfo);
+		if (errCode  != 0) {
+			fprintf(stderr, "TAG_STACK_TRACE failed on %d th stack trace frame\n", i);
+			return errCode;
+		}
+	}
+
+	return 0;
+}
+
+int processTagStackTraceFrame(TagInfo tagInfo) {
+	unsigned long long stackFrameId;
+	if (getId(tagInfo.stream, tagInfo.idSize, &stackFrameId) != 0) {
+		fprintf(stderr, "unable to read %d bytes stackFrameId for TAG_STACK_FRAME\n", tagInfo.idSize);
+		return -1;
+	}
+	fprintf(stdout, "stackFrameId:  %lld\n", stackFrameId);
+	return 0;
 }
 
 /**
@@ -252,10 +304,130 @@ int processTagStackTrace(FILE * f, int dataLength) {
 *     u4 number of bytes allocated
 *     u4 number of instances allocated
 */
-int processTagAllocSites(FILE * f, int dataLength) {
+int processTagAllocSites(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_ALLOC_SITES\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	unsigned int totalRequiredBytes = 4 * 4 + 8 * 2;
+	if (tagInfo.dataLength < totalRequiredBytes) {
+		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		return -1;
+	}
+
+	unsigned int  gcFlags;
+	if (readTwoByteBigEndianStreamToInt(tagInfo.stream, &gcFlags) != 0) {
+		fprintf(stderr, "unable to read u2 gcFlags for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+
+	unsigned int  rawCutoffRatio;
+	if (readBigEndianStreamToInt(tagInfo.stream, &rawCutoffRatio) != 0) {
+		fprintf(stderr, "unable to read u4 rawCutoffRatio for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+	float cutoffRatio = (float)rawCutoffRatio;
+	unsigned int totalLiveBytes;
+	if (readBigEndianStreamToInt(tagInfo.stream, &totalLiveBytes) != 0) {
+		fprintf(stderr, "unable to read u4 totalLiveBytes for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+	unsigned int totalLiveInstances;
+	if (readBigEndianStreamToInt(tagInfo.stream, &totalLiveInstances) != 0) {
+		fprintf(stderr, "unable to read u4 totalLiveInstances for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+	unsigned long long totalBytesAllocated;
+	if (readBigWordSmallWordBigEndianStreamToLong(tagInfo.stream, &totalBytesAllocated) != 0) {
+		fprintf(stderr, "unable to read u8 totalBytesAllocated for TAG_ALLOC_SITES\n");
+		return -1;
+	}	unsigned long long totalInstancesAllocated;
+	if (readBigWordSmallWordBigEndianStreamToLong(tagInfo.stream, &totalInstancesAllocated) != 0) {
+		fprintf(stderr, "unable to read u8 totalInstancesAllocated for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+	fprintf(stdout, "gcFlags:                 %d\n", gcFlags);
+	fprintf(stdout, "rawCutoffRatio:          %d\n", rawCutoffRatio);
+	fprintf(stdout, "cutoffRatio:             %f\n", cutoffRatio);
+	fprintf(stdout, "totalLiveBytes:          %d\n", totalLiveBytes);
+	fprintf(stdout, "totalLiveInstances:      %d\n", totalLiveInstances);
+	fprintf(stdout, "totalBytesAllocated:     %lld\n", totalBytesAllocated);
+	fprintf(stdout, "totalInstancesAllocated: %lld\n", totalInstancesAllocated);
+
+	
+	unsigned int numberOfSites;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfSites) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfFrames for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+	unsigned int bytesLeft = tagInfo.dataLength - totalRequiredBytes;
+	totalRequiredBytes = numberOfSites*(1 * 1 + 4 * 6);
+	if (bytesLeft < totalRequiredBytes) {
+		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes for frames but we only got %d.\n", totalRequiredBytes, bytesLeft);
+	}
+
+	for (unsigned int i = 0; i < numberOfSites; i++) {
+		int errorCode = processATagAllocSite(tagInfo);
+		if (errorCode != 0) {
+			fprintf(stderr, "TAG_ALLOC_SITES failed on %d th site.\n", i);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/*
+*     u1 array indicator: 0 means not an array, non-zero means an array of this type (See Basic Type)
+*     u4 class serial number
+*     u4 stack trace serial number
+*     u4 number of live bytes
+*     u4 number of live instances
+*     u4 number of bytes allocated
+*     u4 number of instances allocated
+*/
+int processATagAllocSite(TagInfo tagInfo) {
+	unsigned int arrayIndicator;
+	if (readByteToInt(tagInfo.stream, &arrayIndicator) != 0) {
+		fprintf(stderr, "unable to read u1 arrayIndicator for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+
+	unsigned int classSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &classSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 classSerialNumber for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+	unsigned int stackTraceSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 stackTraceSerialNumber for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+	unsigned int numberLiveBytes;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberLiveBytes) != 0) {
+		fprintf(stderr, "unable to read u4 numberLiveBytes for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+	unsigned int numberLiveInstances;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberLiveInstances) != 0) {
+		fprintf(stderr, "unable to read u4 numberLiveInstances for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+	unsigned int numberBytesAllocated;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberBytesAllocated) != 0) {
+		fprintf(stderr, "unable to read u4 numberBytesAllocated for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+	unsigned int numberInstancesAllocated;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberInstancesAllocated) != 0) {
+		fprintf(stderr, "unable to read u4 numberInstancesAllocated for TAG_ALLOC_SITES\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -287,7 +459,7 @@ int processTagHeapSummary(TagInfo tagInfo) {
 
 	unsigned long long totalBytesAllocated;
 	if (readBigWordSmallWordBigEndianStreamToLong(tagInfo.stream, &totalBytesAllocated) != 0) {
-		fprintf(stderr, "unable to read u8totalBytesAllocated for TAG_HEAP_SUMMARY\n");
+		fprintf(stderr, "unable to read u8 totalBytesAllocated for TAG_HEAP_SUMMARY\n");
 		return -1;
 	}
 	unsigned long long totalInstancesAllocated;
@@ -418,15 +590,70 @@ int processTagHeapDumpEnd(TagInfo tagInfo) {
 /**
 u4 total number of samples
 u4 number of traces that follow:
-for each
+  for each
+    u4 number of samples
+    u4 stack trace serial number
+*/
+int processTagCpuSamples(TagInfo tagInfo) {
+	fprintf(stdout, "TAG_CPU_SAMPLES\n");
+	int totalRequiredBytes = 2*4;
+	if (tagInfo.dataLength >= totalRequiredBytes) {
+		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+	}
+	
+	unsigned int numberOfSamples;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfSamples) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfSamples for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+	unsigned int numberOfTraces;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfTraces) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfTraces for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+
+	int bytesLeft = tagInfo.dataLength - totalRequiredBytes;
+	if (bytesLeft != 4 * 2 * numberOfTraces) {
+		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes for %d numberOfTraces but we got %d.\n", 4 * 2 * numberOfTraces, numberOfTraces, bytesLeft);
+		return -1;
+	}
+
+	fprintf(stdout, "numberOfSamples:      %d\n", numberOfSamples);
+
+	for (unsigned int i = 0; i < numberOfTraces; i++) {
+		int errorCode = processTagCpuSampleTrace(tagInfo);
+		if (errorCode != 0) {
+			fprintf(stderr, "could not get %d th trace for TAG_CPU_SAMPLES\n", i);
+			return errorCode;
+		}
+	}
+
+	return 0;
+}
+
+/*
 u4 number of samples
 u4 stack trace serial number
 */
-int processTagCpuSamples(FILE * f, int dataLength) {
-	fprintf(stdout, "TAG_CPU_SAMPLES\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+int processTagCpuSampleTrace(TagInfo tagInfo) {
+	unsigned int numberOfSamples;
+	if (readBigEndianStreamToInt(tagInfo.stream, &numberOfSamples) != 0) {
+		fprintf(stderr, "unable to read u4 numberOfSamples for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+	unsigned int stackTraceSerialNumber;
+	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
+		fprintf(stderr, "unable to read u4 stackTraceSerialNumber for TAG_CPU_SAMPLES\n");
+		return -1;
+	}
+
+	fprintf(stdout, "numberOfSamples:        %d\n", numberOfSamples);
+	fprintf(stdout, "stackTraceSerialNumber: %d\n", stackTraceSerialNumber);
+
+
+	return 0;
 }
+
 
 /**
 u4 Bit mask flags:

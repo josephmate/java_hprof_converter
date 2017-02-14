@@ -25,6 +25,18 @@ unsigned long long fromBigWordSmallWordBigEndianWords(unsigned char * data) {
 	        | ((unsigned long long)data[7] <<  0) | ((unsigned long long)data[6] <<  8) | ((unsigned long long)data[5] << 16) | ((unsigned long long)data[4] << 24);
 }
 
+
+int readByteToInt(FILE * f, unsigned int * result) {
+	unsigned char buff[1];
+	size_t chunksRead = fread(buff, 1, 1, f);
+	if (chunksRead != 1) {
+		fprintf(stderr, "was unable to read a chunk of 2 bytes from the stream\n");
+		return -1;
+	}
+	return (unsigned int)buff[0];
+
+}
+
 int readTwoByteBigEndianStreamToInt(FILE * f, unsigned int * result) {
 	char buff[2];
 	size_t chunksRead = fread(buff, 2, 1, f);
