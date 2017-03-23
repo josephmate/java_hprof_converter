@@ -1,7 +1,8 @@
 
-#include "TagInfo.h"
 #include "ProcessTags.h"
+#include "ProcessTagHeap.h"
 #include "StreamUtil.h"
+#include "TagInfo.h"
 #include <stdlib.h>
 
 int processTagStackTraceFrame(TagInfo tagInfo);
@@ -557,13 +558,15 @@ int processTagEndThread(TagInfo tagInfo) {
 	return 0;
 }
 
+
+
+
 /**
 * too complex probably deserves it's own class
 */
 int processTagHeapDump(FILE * f, int dataLength) {
 	fprintf(stdout, "TAG_HEAP_DUMP\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	return processTagHeap(f, dataLength);
 }
 
 /**
@@ -571,8 +574,7 @@ int processTagHeapDump(FILE * f, int dataLength) {
 */
 int processTagHeapSegment(FILE * f, int dataLength) {
 	fprintf(stdout, "TAG_HEAP_DUMP_SEGMENT\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	return processTagHeap(f, dataLength);
 }
 
 /**

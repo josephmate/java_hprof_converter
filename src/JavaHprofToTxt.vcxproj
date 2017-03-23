@@ -147,10 +147,12 @@
   <ItemGroup>
     <ClCompile Include="main.c" />
     <ClCompile Include="ProcessTags.c" />
+    <ClCompile Include="ProcessTagHeap.c" />
     <ClCompile Include="TagInfo.c" />
     <ClCompile Include="StreamUtil.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ProcessTagHeap.h" />
     <ClInclude Include="ProcessTags.h" />
     <ClInclude Include="StreamUtil.h" />
     <ClInclude Include="TagInfo.h" />
