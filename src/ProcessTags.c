@@ -562,7 +562,7 @@ int processTagEndThread(TagInfo tagInfo) {
 
 
 /**
-* too complex probably deserves it's own class
+* see processTagHeap
 */
 int processTagHeapDump(FILE * f, int dataLength) {
 	fprintf(stdout, "TAG_HEAP_DUMP\n");
@@ -570,7 +570,7 @@ int processTagHeapDump(FILE * f, int dataLength) {
 }
 
 /**
-* see processTagHeapSegment
+* see processTagHeap
 */
 int processTagHeapSegment(FILE * f, int dataLength) {
 	fprintf(stdout, "TAG_HEAP_DUMP_SEGMENT\n");
