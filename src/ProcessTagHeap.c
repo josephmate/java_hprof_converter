@@ -47,7 +47,43 @@ BASIC TYPES
 #define HEAP_INSTANCE_DUMP           0x21
 #define HEAP_OBJECT_ARRAY_DUMP       0x22
 #define HEAP_PRIMITIVE_ARRAY_DUMP    0x23
+#define HEAP_DUMP_END                0x2C
 int processTagHeap(FILE * f, int dataLength) {
+	switch (tagType) {
+		case HEAP_ROOT_UNKNOWN:
+			processHeapRootUnknown(f, dataLength);
+		case HEAP_ROOT_JNI_GLOBAL:
+			processHeapRootJniGlobal(f, dataLength);
+		case HEAP_ROOT_JNI_LOCAL:
+			processHeapRootJniLocal(f, dataLength);
+		case HEAP_ROOT_JAVA_FRAME:
+			processHeapRootJavaFrame(f, dataLength);
+		case HEAP_ROOT_NATIVE_STACK:
+			processHeapRootNativeStack(f, dataLength);
+		case HEAP_ROOT_STICKY_CLASS:
+			processHeapRootStickyClass(f, dataLength);
+		case HEAP_ROOT_THREAD_BLOCK:
+			processHeapRootThreadBlock(f, dataLength);
+		case HEAP_ROOT_MONITOR_USED:
+			processHeapRootMonitorUsed(f, dataLength);
+		case HEAP_ROOT_THREAD_OBJECT:
+			processHeapRootThreadObject(f, dataLength);
+		case HEAP_ROOT_THREAD_OBJECT:
+			processHeapRootThreadObject(f, dataLength);
+		case HEAP_CLASS_DUMP:
+			processHeapClassDump(f, dataLength);
+		case HEAP_INSTANCE_DUMP:
+			processHeapInstanceDump(f, dataLength);
+		case HEAP_OBJECT_ARRAY_DUMP:
+			processHeapObjectArrayDump(f, dataLength);
+		case HEAP_PRIMITIVE_ARRAY_DUMP:
+			processHeapPrimitiveArrayDump(f, dataLength);
+		case HEAP_DUMP_END:
+		default:
+			fprintf(stdout, "tag not recognized or implemented: %d", tagType);
+			return iterateThroughStream(tagInfo.stream, tagInfo.dataLength);
+	}
+
 	// TODO
 	return iterateThroughStream(f, dataLength);
 }
