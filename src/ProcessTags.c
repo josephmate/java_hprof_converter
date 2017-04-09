@@ -93,7 +93,7 @@ int processTagString(TagInfo tagInfo) {
 */
 int processTagLoadClass(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_LOAD_CLASS\n");
-	int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
+	unsigned int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_LOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
@@ -232,7 +232,7 @@ int processTagStackFrame(TagInfo tagInfo) {
 */
 int processTagStackTrace(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_STACK_TRACE\n");
-	int totalRequiredBytes = 3 * 4;
+	unsigned int totalRequiredBytes = 3 * 4;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
@@ -598,7 +598,7 @@ u4 number of traces that follow:
 */
 int processTagCpuSamples(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_CPU_SAMPLES\n");
-	int totalRequiredBytes = 2*4;
+	unsigned int totalRequiredBytes = 2*4;
 	if (tagInfo.dataLength >= totalRequiredBytes) {
 		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
 	}

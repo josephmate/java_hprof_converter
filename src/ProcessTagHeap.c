@@ -5,20 +5,20 @@
 
 
 
-int processHeapRootUnknown(FILE * f, int dataLength);
-int processHeapRootJniGlobal(FILE * f, int dataLength);
-int processHeapRootJniLocal(FILE * f, int dataLength);
-int processHeapRootJavaFrame(FILE * f, int dataLength);
-int processHeapRootNativeStack(FILE * f, int dataLength);
-int processHeapRootStickyClass(FILE * f, int dataLength);
-int processHeapRootThreadBlock(FILE * f, int dataLength);
-int processHeapRootMonitorUsed(FILE * f, int dataLength);
-int processHeapRootThreadObject(FILE * f, int dataLength);
-int processHeapRootThreadObject(FILE * f, int dataLength);
-int processHeapClassDump(FILE * f, int dataLength);
-int processHeapInstanceDump(FILE * f, int dataLength);
-int processHeapObjectArrayDump(FILE * f, int dataLength);
-int processHeapPrimitiveArrayDump(FILE * f, int dataLength);
+int processHeapRootUnknown(FILE * f, unsigned int * dataLength);
+int processHeapRootJniGlobal(FILE * f, unsigned int * dataLength);
+int processHeapRootJniLocal(FILE * f, unsigned int * dataLength);
+int processHeapRootJavaFrame(FILE * f, unsigned int * dataLength);
+int processHeapRootNativeStack(FILE * f, unsigned int * dataLength);
+int processHeapRootStickyClass(FILE * f, unsigned int * dataLength);
+int processHeapRootThreadBlock(FILE * f, unsigned int * dataLength);
+int processHeapRootMonitorUsed(FILE * f, unsigned int * dataLength);
+int processHeapRootThreadObject(FILE * f, unsigned int * dataLength);
+int processHeapRootThreadObject(FILE * f, unsigned int * dataLength);
+int processHeapClassDump(FILE * f, unsigned int * dataLength);
+int processHeapInstanceDump(FILE * f, unsigned int * dataLength);
+int processHeapObjectArrayDump(FILE * f, unsigned int * dataLength);
+int processHeapPrimitiveArrayDump(FILE * f, unsigned int * dataLength);
 
 /*
 BASIC TYPES
@@ -49,43 +49,105 @@ BASIC TYPES
 #define HEAP_PRIMITIVE_ARRAY_DUMP    0x23
 #define HEAP_DUMP_END                0x2C
 int processTagHeap(FILE * f, int dataLength) {
-	switch (tagType) {
+	unsigned int tagType;
+
+	while (dataLength > 0) {
+		int errCode = readByteToInt(f, &tagType);
+		if (errCode != 0) {
+			fprintf(stderr, "could not read heap tag type. reached end of stream too early\n");
+			return errCode;
+		}
+		fprintf(stdout, "heap tag type: %d \n", tagType);
+		dataLength = dataLength - 1;
+		switch (tagType) {
 		case HEAP_ROOT_UNKNOWN:
-			processHeapRootUnknown(f, dataLength);
+			errCode = processHeapRootUnknown(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_JNI_GLOBAL:
-			processHeapRootJniGlobal(f, dataLength);
+			errCode = processHeapRootJniGlobal(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_JNI_LOCAL:
-			processHeapRootJniLocal(f, dataLength);
+			errCode = processHeapRootJniLocal(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_JAVA_FRAME:
-			processHeapRootJavaFrame(f, dataLength);
+			errCode = processHeapRootJavaFrame(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_NATIVE_STACK:
-			processHeapRootNativeStack(f, dataLength);
+			errCode = processHeapRootNativeStack(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_STICKY_CLASS:
-			processHeapRootStickyClass(f, dataLength);
+			errCode = processHeapRootStickyClass(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_THREAD_BLOCK:
-			processHeapRootThreadBlock(f, dataLength);
+			errCode = processHeapRootThreadBlock(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_MONITOR_USED:
-			processHeapRootMonitorUsed(f, dataLength);
+			errCode = processHeapRootMonitorUsed(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_ROOT_THREAD_OBJECT:
-			processHeapRootThreadObject(f, dataLength);
-		case HEAP_ROOT_THREAD_OBJECT:
-			processHeapRootThreadObject(f, dataLength);
+			errCode = processHeapRootThreadObject(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_CLASS_DUMP:
-			processHeapClassDump(f, dataLength);
+			errCode = processHeapClassDump(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_INSTANCE_DUMP:
-			processHeapInstanceDump(f, dataLength);
+			errCode = processHeapInstanceDump(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_OBJECT_ARRAY_DUMP:
-			processHeapObjectArrayDump(f, dataLength);
+			errCode = processHeapObjectArrayDump(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_PRIMITIVE_ARRAY_DUMP:
-			processHeapPrimitiveArrayDump(f, dataLength);
+			errCode = processHeapPrimitiveArrayDump(f, &dataLength);
+			if (errCode != 0) {
+				return errCode;
+			}
+			break;
 		case HEAP_DUMP_END:
+			return 0;
 		default:
 			fprintf(stdout, "tag not recognized or implemented: %d", tagType);
-			return iterateThroughStream(tagInfo.stream, tagInfo.dataLength);
+			return iterateThroughStream(f, dataLength);
+		}
 	}
 
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stderr, "was expecting tag %d but never found\n", HEAP_DUMP_END);
+	return -1;
 }
 
 
@@ -95,8 +157,12 @@ HEAP_ROOT_UNKNOWN
 ID object ID
 */
 
-int processHeapRootUnknown(FILE * f, int dataLength) {
-	return iterateThroughStream(f, dataLength);
+int processHeapRootUnknown(FILE * f, unsigned int * dataLength) {
+	// TODO
+	fprintf(stdout, "HEAP_ROOT_UNKNOWN\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -104,9 +170,12 @@ HEAP_ROOT_JNI_GLOBAL
 ID object ID
 ID JNI global ref ID
 */
-int processHeapRootJniGlobal(FILE * f, int dataLength){
+int processHeapRootJniGlobal(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_JNI_GLOBAL\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -115,9 +184,12 @@ ID object ID
 u4 thread serial number
 u4 frame number in stack trace(-1 for empty)
 */
-int processHeapRootJniLocal(FILE * f, int dataLength){
+int processHeapRootJniLocal(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_JNI_LOCAL\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -126,9 +198,12 @@ ID object ID
 u4 thread serial number
 u4 frame number in stack trace(-1 for empty)
 */
-int processHeapRootJavaFrame(FILE * f, int dataLength){
+int processHeapRootJavaFrame(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_JAVA_FRAME\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -136,18 +211,24 @@ HEAP_ROOT_NATIVE_STACK
 ID object ID
 u4 thread serial number
 */
-int processHeapRootNativeStack(FILE * f, int dataLength){
+int processHeapRootNativeStack(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
 HEAP_ROOT_STICKY_CLASS
 ID object ID
 */
-int processHeapRootStickyClass(FILE * f, int dataLength){
+int processHeapRootStickyClass(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_STICKY_CLASS\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -155,18 +236,24 @@ HEAP_ROOT_THREAD_BLOCK
 ID object ID
 u4 thread serial number
 */
-int processHeapRootThreadBlock(FILE * f, int dataLength){
+int processHeapRootThreadBlock(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
 HEAP_ROOT_MONITOR_USED
 ID object ID
 */
-int processHeapRootMonitorUsed(FILE * f, int dataLength){
+int processHeapRootMonitorUsed(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_MONITOR_USED\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -175,9 +262,12 @@ ID thread object id
 u4 thread serial number
 u4 stack trace serial number
 */
-int processHeapRootThreadObject(FILE * f, int dataLength){
+int processHeapRootThreadObject(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_ROOT_THREAD_OBJECT\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -205,9 +295,12 @@ u2 Number of instance fields(not including super class's)
 ID field name string ID
 u1 type of field : (See Basic Type)
 */
-int processHeapClassDump(FILE * f, int dataLength){
+int processHeapClassDump(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_CLASS_DUMP\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -218,9 +311,12 @@ ID class object ID
 u4 number of bytes that follow
 	[value] * instance field values(this class, followed by super class, etc)
 */
-int processHeapInstanceDump(FILE * f, int dataLength){
+int processHeapInstanceDump(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_INSTANCE_DUMP\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -231,9 +327,12 @@ u4 number of elements
 ID array class object ID
 [ID] * elements
 */
-int processHeapObjectArrayDump(FILE * f, int dataLength){
+int processHeapObjectArrayDump(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_OBJECT_ARRAY_DUMP\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 /*
@@ -244,9 +343,12 @@ u4 number of elements
 u1 element type(See Basic Type)
 [u1] * elements(packed array)
 */
-int processHeapPrimitiveArrayDump(FILE * f, int dataLength){
+int processHeapPrimitiveArrayDump(FILE * f, unsigned int * dataLength){
 	// TODO
-	return iterateThroughStream(f, dataLength);
+	fprintf(stdout, "HEAP_PRIMITIVE_ARRAY_DUMP\n");
+	int errCode = iterateThroughStream(f, *dataLength);
+	*dataLength = 0;
+	return errCode;
 }
 
 
