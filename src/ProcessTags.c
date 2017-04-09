@@ -45,9 +45,9 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	case TAG_END_THREAD:
 		return processTagEndThread(tagInfo);
 	case TAG_HEAP_DUMP:
-		return processTagHeapDump(tagInfo.stream, tagInfo.dataLength);
+		return processTagHeapDump(tagInfo);
 	case TAG_HEAP_DUMP_SEGMENT:
-		return processTagHeapSegment(tagInfo.stream, tagInfo.dataLength);
+		return processTagHeapSegment(tagInfo);
 	case TAG_HEAP_DUMP_END:
 		return processTagHeapDumpEnd(tagInfo);
 	case TAG_CPU_SAMPLES:
@@ -564,17 +564,17 @@ int processTagEndThread(TagInfo tagInfo) {
 /**
 * see processTagHeap
 */
-int processTagHeapDump(FILE * f, int dataLength) {
+int processTagHeapDump(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_HEAP_DUMP\n");
-	return processTagHeap(f, dataLength);
+	return processTagHeap(tagInfo);
 }
 
 /**
 * see processTagHeap
 */
-int processTagHeapSegment(FILE * f, int dataLength) {
+int processTagHeapSegment(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_HEAP_DUMP_SEGMENT\n");
-	return processTagHeap(f, dataLength);
+	return processTagHeap(tagInfo);
 }
 
 /**
