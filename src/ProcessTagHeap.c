@@ -158,10 +158,15 @@ ID object ID
 */
 
 int processHeapRootUnknown(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_UNKNOWN\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
+	unsigned long long id;
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &id);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain object id of HEAP_ROOT_UNKNOWN\n");
+		return errCode;
+	}
+	fprintf(stdout, "HEAP_ROOT_UNKNOWN %lld\n", id);
+	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
 	return errCode;
 }
 
@@ -171,10 +176,25 @@ ID object ID
 ID JNI global ref ID
 */
 int processHeapRootJniGlobal(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_JNI_GLOBAL\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
+	unsigned long long objId;
+	unsigned long long jniGlobalRefId;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_ROOT_JNI_GLOBAL\n");
+		return errCode;
+	}
+
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &jniGlobalRefId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain jniGlobalRefId of HEAP_ROOT_JNI_GLOBAL\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_ROOT_JNI_GLOBAL objId:%lld jniGlobalRefId:%lld\n", objId, jniGlobalRefId);
+
+	tagInfo->dataLength = tagInfo->dataLength - 2*tagInfo->idSize;
 	return errCode;
 }
 
@@ -185,11 +205,32 @@ u4 thread serial number
 u4 frame number in stack trace(-1 for empty)
 */
 int processHeapRootJniLocal(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_JNI_LOCAL\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int threadSerialNum;
+	unsigned int frameNumber;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_ROOT_JNI_LOCAL\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &threadSerialNum);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain threadSerialNum of HEAP_ROOT_JNI_LOCAL\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &frameNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain frameNumber of HEAP_ROOT_JNI_LOCAL\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_ROOT_JNI_LOCAL objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
+
+	return 0;
 }
 
 /*
@@ -199,11 +240,32 @@ u4 thread serial number
 u4 frame number in stack trace(-1 for empty)
 */
 int processHeapRootJavaFrame(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_JAVA_FRAME\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int threadSerialNum;
+	unsigned int frameNumber;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_ROOT_JAVA_FRAME\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &threadSerialNum);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain threadSerialNum of HEAP_ROOT_JAVA_FRAME\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &frameNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain frameNumber of HEAP_ROOT_JAVA_FRAME\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_ROOT_JAVA_FRAME objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
+
+	return 0;
 }
 
 /*
@@ -212,11 +274,25 @@ ID object ID
 u4 thread serial number
 */
 int processHeapRootNativeStack(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int threadSerialNum;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_ROOT_NATIVE_STACK\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &threadSerialNum);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain threadSerialNum of HEAP_ROOT_NATIVE_STACK\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum);
+
+	return 0;
 }
 
 /*
@@ -224,10 +300,15 @@ HEAP_ROOT_STICKY_CLASS
 ID object ID
 */
 int processHeapRootStickyClass(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_STICKY_CLASS\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
+	unsigned long long id;
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &id);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain object id of HEAP_ROOT_STICKY_CLASS\n");
+		return errCode;
+	}
+	fprintf(stdout, "HEAP_ROOT_STICKY_CLASS objId:%lld\n", id);
+	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
 	return errCode;
 }
 
@@ -237,11 +318,25 @@ ID object ID
 u4 thread serial number
 */
 int processHeapRootThreadBlock(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int threadSerialNum;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_ROOT_THREAD_BLOCK\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &threadSerialNum);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain threadSerialNum of HEAP_ROOT_THREAD_BLOCK\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum);
+
+	return 0;
 }
 
 /*
@@ -249,10 +344,15 @@ HEAP_ROOT_MONITOR_USED
 ID object ID
 */
 int processHeapRootMonitorUsed(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_MONITOR_USED\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
+	unsigned long long id;
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &id);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain object id of HEAP_ROOT_MONITOR_USED\n");
+		return errCode;
+	}
+	fprintf(stdout, "HEAP_ROOT_MONITOR_USED objId:%lld\n", id);
+	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
 	return errCode;
 }
 
@@ -263,11 +363,32 @@ u4 thread serial number
 u4 stack trace serial number
 */
 int processHeapRootThreadObject(TagInfo * tagInfo) {
-	// TODO
 	fprintf(stdout, "HEAP_ROOT_THREAD_OBJECT\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int threadSerialNum;
+	unsigned int frameNumber;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_ROOT_THREAD_OBJECT\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &threadSerialNum);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain threadSerialNum of HEAP_ROOT_THREAD_OBJECT\n");
+		return errCode;
+	}
+
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &frameNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain frameNumber of HEAP_ROOT_THREAD_OBJECT\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_ROOT_THREAD_OBJECT objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
+
+	return 0;
 }
 
 /*
