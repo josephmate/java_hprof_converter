@@ -33,8 +33,8 @@ int readByteToInt(FILE * f, unsigned int * result) {
 		fprintf(stderr, "was unable to read a chunk of 2 bytes from the stream\n");
 		return -1;
 	}
-	return (unsigned int)buff[0];
-
+	*result = (unsigned int)buff[0];
+	return 0;
 }
 
 int readTwoByteBigEndianStreamToInt(FILE * f, unsigned int * result) {

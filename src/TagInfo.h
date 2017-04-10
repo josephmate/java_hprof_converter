@@ -7,7 +7,7 @@
 /* Contains all the info necessary for tag processing */
 struct TagInfo {
 	FILE * stream;
-	int dataLength;
+	unsigned int dataLength;
 	int idSize;
 };
 typedef struct TagInfo TagInfo;

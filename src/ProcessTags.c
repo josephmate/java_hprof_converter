@@ -1,7 +1,8 @@
 
-#include "TagInfo.h"
 #include "ProcessTags.h"
+#include "ProcessTagHeap.h"
 #include "StreamUtil.h"
+#include "TagInfo.h"
 #include <stdlib.h>
 
 int processTagStackTraceFrame(TagInfo tagInfo);
@@ -44,9 +45,9 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 	case TAG_END_THREAD:
 		return processTagEndThread(tagInfo);
 	case TAG_HEAP_DUMP:
-		return processTagHeapDump(tagInfo.stream, tagInfo.dataLength);
+		return processTagHeapDump(tagInfo);
 	case TAG_HEAP_DUMP_SEGMENT:
-		return processTagHeapSegment(tagInfo.stream, tagInfo.dataLength);
+		return processTagHeapSegment(tagInfo);
 	case TAG_HEAP_DUMP_END:
 		return processTagHeapDumpEnd(tagInfo);
 	case TAG_CPU_SAMPLES:
@@ -92,7 +93,7 @@ int processTagString(TagInfo tagInfo) {
 */
 int processTagLoadClass(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_LOAD_CLASS\n");
-	int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
+	unsigned int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_LOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
@@ -231,7 +232,7 @@ int processTagStackFrame(TagInfo tagInfo) {
 */
 int processTagStackTrace(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_STACK_TRACE\n");
-	int totalRequiredBytes = 3 * 4;
+	unsigned int totalRequiredBytes = 3 * 4;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
@@ -557,22 +558,23 @@ int processTagEndThread(TagInfo tagInfo) {
 	return 0;
 }
 
+
+
+
 /**
-* too complex probably deserves it's own class
+* see processTagHeap
 */
-int processTagHeapDump(FILE * f, int dataLength) {
+int processTagHeapDump(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_HEAP_DUMP\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	return processTagHeap(tagInfo);
 }
 
 /**
-* see processTagHeapSegment
+* see processTagHeap
 */
-int processTagHeapSegment(FILE * f, int dataLength) {
+int processTagHeapSegment(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_HEAP_DUMP_SEGMENT\n");
-	// TODO
-	return iterateThroughStream(f, dataLength);
+	return processTagHeap(tagInfo);
 }
 
 /**
@@ -596,7 +598,7 @@ u4 number of traces that follow:
 */
 int processTagCpuSamples(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_CPU_SAMPLES\n");
-	int totalRequiredBytes = 2*4;
+	unsigned int totalRequiredBytes = 2*4;
 	if (tagInfo.dataLength >= totalRequiredBytes) {
 		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
