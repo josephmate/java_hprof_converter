@@ -16,6 +16,7 @@ int processHeapRootMonitorUsed(TagInfo * tagInfo);
 int processHeapRootThreadObject(TagInfo * tagInfo);
 int processHeapRootThreadObject(TagInfo * tagInfo);
 int processHeapClassDump(TagInfo * tagInfo);
+int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry);
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
@@ -32,6 +33,16 @@ BASIC TYPES
 10 int
 11 long
 */
+#define BASIC_TYPE_OBJECT 2
+#define BASIC_TYPE_BOOLEAN 4
+#define BASIC_TYPE_CHAR 5
+#define BASIC_TYPE_FLOAT 6
+#define BASIC_TYPE_DOUBLE 7
+#define BASIC_TYPE_BYTE 8
+#define BASIC_TYPE_SHORT 9
+#define BASIC_TYPE_INT 10
+#define BASIC_TYPE_LONG 11
+
 
 #define HEAP_ROOT_UNKNOWN            0xFF
 #define HEAP_ROOT_JNI_GLOBAL         0x01
@@ -57,7 +68,7 @@ int processTagHeap(TagInfo tagInfo) {
 			fprintf(stderr, "could not read heap tag type. reached end of stream too early\n");
 			return errCode;
 		}
-		fprintf(stdout, "heap tag type: %d \n", tagType);
+		//fprintf(stdout, "heap tag type: %d \n", tagType);
 		tagInfo.dataLength = tagInfo.dataLength - 1;
 		switch (tagType) {
 		case HEAP_ROOT_UNKNOWN:
@@ -158,7 +169,6 @@ ID object ID
 */
 
 int processHeapRootUnknown(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_UNKNOWN\n");
 	unsigned long long id;
 	int errCode = getId(tagInfo->stream, tagInfo->idSize, &id);
 	if (errCode != 0) {
@@ -176,7 +186,6 @@ ID object ID
 ID JNI global ref ID
 */
 int processHeapRootJniGlobal(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_JNI_GLOBAL\n");
 	unsigned long long objId;
 	unsigned long long jniGlobalRefId;
 
@@ -205,7 +214,6 @@ u4 thread serial number
 u4 frame number in stack trace(-1 for empty)
 */
 int processHeapRootJniLocal(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_JNI_LOCAL\n");
 	unsigned long long objId;
 	unsigned int threadSerialNum;
 	unsigned int frameNumber;
@@ -230,6 +238,7 @@ int processHeapRootJniLocal(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_JNI_LOCAL objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
 
+	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 2 * 4;
 	return 0;
 }
 
@@ -240,7 +249,6 @@ u4 thread serial number
 u4 frame number in stack trace(-1 for empty)
 */
 int processHeapRootJavaFrame(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_JAVA_FRAME\n");
 	unsigned long long objId;
 	unsigned int threadSerialNum;
 	unsigned int frameNumber;
@@ -265,6 +273,7 @@ int processHeapRootJavaFrame(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_JAVA_FRAME objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
 
+	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 2 * 4;
 	return 0;
 }
 
@@ -274,7 +283,6 @@ ID object ID
 u4 thread serial number
 */
 int processHeapRootNativeStack(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK\n");
 	unsigned long long objId;
 	unsigned int threadSerialNum;
 
@@ -290,8 +298,9 @@ int processHeapRootNativeStack(TagInfo * tagInfo) {
 		return errCode;
 	}
 
-	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum);
+	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK objId:%lld, threadSerialNum:%d\n", objId, threadSerialNum);
 
+	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 1 * 4;
 	return 0;
 }
 
@@ -300,7 +309,6 @@ HEAP_ROOT_STICKY_CLASS
 ID object ID
 */
 int processHeapRootStickyClass(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_STICKY_CLASS\n");
 	unsigned long long id;
 	int errCode = getId(tagInfo->stream, tagInfo->idSize, &id);
 	if (errCode != 0) {
@@ -308,7 +316,7 @@ int processHeapRootStickyClass(TagInfo * tagInfo) {
 		return errCode;
 	}
 	fprintf(stdout, "HEAP_ROOT_STICKY_CLASS objId:%lld\n", id);
-	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
+	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize;
 	return errCode;
 }
 
@@ -318,7 +326,6 @@ ID object ID
 u4 thread serial number
 */
 int processHeapRootThreadBlock(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK\n");
 	unsigned long long objId;
 	unsigned int threadSerialNum;
 
@@ -334,8 +341,9 @@ int processHeapRootThreadBlock(TagInfo * tagInfo) {
 		return errCode;
 	}
 
-	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum);
+	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK objId:%lld, threadSerialNum:%d\n", objId, threadSerialNum);
 
+	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 1 * 4;
 	return 0;
 }
 
@@ -388,6 +396,7 @@ int processHeapRootThreadObject(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_THREAD_OBJECT objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
 
+	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 2 * 4;
 	return 0;
 }
 
@@ -403,9 +412,9 @@ ID reserved
 ID reserved
 u4 instance size(in bytes)
 u2 size of constant pool and number of records that follow :
-u2 constant pool index
-u1 type of entry : (See Basic Type)
-value value of entry(u1, u2, u4, or u8 based on type of entry)
+	u2 constant pool index
+	u1 type of entry : (See Basic Type)
+	value value of entry(u1, u2, u4, or u8 based on type of entry)
 
 u2 Number of static fields :
 ID static field name string ID
@@ -417,11 +426,191 @@ ID field name string ID
 u1 type of field : (See Basic Type)
 */
 int processHeapClassDump(TagInfo * tagInfo) {
-	// TODO
-	fprintf(stdout, "HEAP_CLASS_DUMP\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
+	unsigned long long classObjId;
+	unsigned int stackTraceSerialNumber;
+	unsigned long long superClassObjId;
+	unsigned long long classLoaderObjectId;
+	unsigned long long signersObjectId;
+	unsigned long long protectionDomainObjectId;
+	unsigned long long reserved1;
+	unsigned long long reserved2;
+	unsigned int instanceSize;
+	unsigned int sizeOfConstantPool;
+
+
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &classObjId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain classObjId of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &stackTraceSerialNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain stackTraceSerialNumber of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &superClassObjId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain superClassObjId of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &classLoaderObjectId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain classLoaderObjectId of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &signersObjectId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain signersObjectId of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &protectionDomainObjectId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain protectionDomainObjectId of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &reserved1);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain reserved1 of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &reserved2);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain reserved2 of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &instanceSize);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain instanceSize of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &sizeOfConstantPool);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain classObjId of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	fprintf(stdout,
+		"HEAP_CLASS_DUMP classObjId:%lld, stackTraceSerialNumber:%d, superClassObjId:%lld, classLoaderObjectId:%lld, signersObjectId:%lld, protectionDomainObjectId:%lld, reserved1:%lld, reserved2:%lld, instanceSize:%d, sizeOfConstantPool:%d\n",
+		classObjId, stackTraceSerialNumber, superClassObjId, classLoaderObjectId, signersObjectId, protectionDomainObjectId, reserved1, reserved2, instanceSize, sizeOfConstantPool
+	);
+	// 7 ID
+	// 2 u4
+	// 1 u2
+	tagInfo->dataLength = tagInfo->dataLength - 7 * tagInfo->idSize - 2 * 4 - 1 * 2;
+
+
+	// iterate over constant pool
+	for (unsigned int i = 0; i < sizeOfConstantPool; i++) {
+		errCode = processConstantPoolRecord(tagInfo, i);
+		if (errCode != 0) {
+			return errCode;
+		}
+	}
+
+	errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
 	tagInfo->dataLength = 0;
 	return errCode;
+}
+
+/*
+	u2 constant pool index
+	u1 type of entry : (See Basic Type)
+	value value of entry(u1, u2, u4, or u8 based on type of entry)
+
+	BASIC TYPES
+	2 object
+	4 boolean
+	5 char
+	6 float
+	7 double
+	8 byte
+	9 short
+	10 int
+	11 long
+*/
+int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
+	unsigned int constantPoolIndex;
+	unsigned int typeOfEntry;
+	unsigned int oneToFourByteValue;
+	unsigned long long eightByteValue;
+
+	int errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &constantPoolIndex);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain constantPoolIndex entry %d of processConstantPoolRecord\n", entry);
+		return errCode;
+	}
+	errCode = readByteToInt(tagInfo->stream, &typeOfEntry);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain typeOfEntry entry %d of processConstantPoolRecord\n", entry);
+		return errCode;
+	}
+
+	fprintf(stdout, "\tconstantPoolIndex:%d, typeOfEntry:%d, ", constantPoolIndex, typeOfEntry);
+	tagInfo->dataLength = tagInfo->dataLength - 2 - 1;
+
+	switch (typeOfEntry) {
+
+	case BASIC_TYPE_BOOLEAN:
+	case BASIC_TYPE_CHAR:
+	case BASIC_TYPE_BYTE:
+		errCode = readByteToInt(tagInfo->stream, &oneToFourByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			return errCode;
+		}
+		fprintf(stdout, "value:%d\n", oneToFourByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 1;
+		break;
+
+
+	case BASIC_TYPE_SHORT:
+		errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			return errCode;
+		}
+		fprintf(stdout, "value:%d\n", oneToFourByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 2;
+		break;
+
+	case BASIC_TYPE_FLOAT:
+	case BASIC_TYPE_INT :
+		errCode = readBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			return errCode;
+		}
+		if (typeOfEntry == BASIC_TYPE_INT) {
+			fprintf(stdout, "value:%d\n", oneToFourByteValue);
+		} else {
+			fprintf(stdout, "value:%f\n", (float)oneToFourByteValue);
+		}
+		tagInfo->dataLength = tagInfo->dataLength - 4;
+		break;
+		break;
+	case BASIC_TYPE_DOUBLE:
+	case BASIC_TYPE_LONG:
+		errCode = readBigWordSmallWordBigEndianStreamToLong(tagInfo->stream, &eightByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			return errCode;
+		}
+		if (typeOfEntry == BASIC_TYPE_LONG) {
+			fprintf(stdout, "value:%lld\n", eightByteValue);
+		}
+		else {
+			fprintf(stdout, "value:%Le\n", (long double)oneToFourByteValue);
+		}
+		tagInfo->dataLength = tagInfo->dataLength - 8;
+		break;
+	case BASIC_TYPE_OBJECT:
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 /*
