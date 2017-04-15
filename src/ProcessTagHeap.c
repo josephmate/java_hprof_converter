@@ -23,6 +23,7 @@ int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry);
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
+int processHeapPrimitiveArrayRecord(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source);
 
 /*
 BASIC TYPES
@@ -607,6 +608,7 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 	int errCode;
 
 	errCode = readByteToInt(tagInfo->stream, &typeOfEntry);
+	tagInfo->dataLength = tagInfo->dataLength - 1;
 	if (errCode != 0) {
 		fprintf(stderr, "Could not obtain typeOfEntry entry %d of %s\n", entry, source);
 		return errCode;
@@ -654,7 +656,6 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 		}
 		tagInfo->dataLength = tagInfo->dataLength - 4;
 		break;
-		break;
 	case BASIC_TYPE_DOUBLE:
 	case BASIC_TYPE_LONG:
 		errCode = readBigWordSmallWordBigEndianStreamToLong(tagInfo->stream, &eightByteValue);
@@ -672,12 +673,12 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 		break;
 	case BASIC_TYPE_OBJECT:
 		errCode = getId(tagInfo->stream, tagInfo->idSize, &eightByteValue);
-		tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize;
 		if (errCode != 0) {
 			fprintf(stderr, "\nCould not obtain BASIC_TYPE_OBJECT entry %d of %s\n", entry, source);
 			return errCode;
 		}
 		fprintf(stdout, "value:%lld\n", eightByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize;
 		break;
 	default:
 		fprintf(stderr, "\ntypeOfEntry %d not recognized entry %d of %s\n", typeOfEntry, entry, source);
@@ -759,11 +760,127 @@ u1 element type(See Basic Type)
 [u1] * elements(packed array)
 */
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo) {
-	// TODO
-	fprintf(stdout, "HEAP_PRIMITIVE_ARRAY_DUMP\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long arrayObjId;
+	unsigned int stackTraceSerialNumber;
+	unsigned int numOfElements;
+	unsigned int typeOfEntry;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &arrayObjId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain arrayObjId of HEAP_PRIMITIVE_ARRAY_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &stackTraceSerialNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain stackTraceSerialNumber of HEAP_PRIMITIVE_ARRAY_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &numOfElements);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain numOfElements of HEAP_PRIMITIVE_ARRAY_DUMP\n");
+		return errCode;
+	}
+	errCode = readByteToInt(tagInfo->stream, &typeOfEntry);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain typeOfEntry of HEAP_PRIMITIVE_ARRAY_DUMP\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_PRIMITIVE_ARRAY_DUMP: arrayObjId:%lld, stackTraceSerialNumber:%d, numOfElements:%d, typeOfEntry%d\n",
+		arrayObjId, stackTraceSerialNumber, numOfElements, typeOfEntry
+	);
+
+	tagInfo->dataLength =
+		tagInfo->dataLength
+		- 1 * tagInfo->idSize
+		- 2 * 4;
+		- 1 * 1;
+
+		for (unsigned int i = 0; i < numOfElements; i++) {
+		errCode = processHeapPrimitiveArrayRecord(tagInfo, typeOfEntry, i, "HEAP_PRIMITIVE_ARRAY_DUMP");
+		if (errCode != 0) {
+			return errCode;
+		}
+	}
+
+	return 0;
 }
 
+int processHeapPrimitiveArrayRecord(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source) {
+	unsigned int oneToFourByteValue;
+	unsigned long long eightByteValue;
+	int errCode;
+
+	switch (typeOfEntry) {
+
+	case BASIC_TYPE_BOOLEAN:
+	case BASIC_TYPE_BYTE:
+		errCode = readByteToInt(tagInfo->stream, &oneToFourByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
+			return errCode;
+		}
+		fprintf(stdout, "\tvalue:%d\n", oneToFourByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 1;
+		break;
+
+
+	case BASIC_TYPE_CHAR:
+	case BASIC_TYPE_SHORT:
+		errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
+			return errCode;
+		}
+		fprintf(stdout, "\tvalue:%d\n", oneToFourByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 2;
+		break;
+
+	case BASIC_TYPE_FLOAT:
+	case BASIC_TYPE_INT:
+		errCode = readBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
+			return errCode;
+		}
+		if (typeOfEntry == BASIC_TYPE_INT) {
+			fprintf(stdout, "\tvalue:%d\n", oneToFourByteValue);
+		}
+		else {
+			fprintf(stdout, "\tvalue:%f\n", (float)oneToFourByteValue);
+		}
+		tagInfo->dataLength = tagInfo->dataLength - 4;
+		break;
+	case BASIC_TYPE_DOUBLE:
+	case BASIC_TYPE_LONG:
+		errCode = readBigWordSmallWordBigEndianStreamToLong(tagInfo->stream, &eightByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
+			return errCode;
+		}
+		if (typeOfEntry == BASIC_TYPE_LONG) {
+			fprintf(stdout, "\tvalue:%lld\n", eightByteValue);
+		}
+		else {
+			fprintf(stdout, "\tvalue:%Le\n", (long double)eightByteValue);
+		}
+		tagInfo->dataLength = tagInfo->dataLength - 8;
+		break;
+	case BASIC_TYPE_OBJECT:
+		errCode = getId(tagInfo->stream, tagInfo->idSize, &eightByteValue);
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain BASIC_TYPE_OBJECT entry %d of %s\n", entry, source);
+			return errCode;
+		}
+		fprintf(stdout, "\tvalue:%lld\n", eightByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize;
+		break;
+	default:
+		fprintf(stderr, "\ntypeOfEntry %d not recognized entry %d of %s\n", typeOfEntry, entry, source);
+		return -1;
+		break;
+	}
+
+	return 0;
+}
 
