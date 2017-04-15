@@ -100,7 +100,7 @@ int printTag(unsigned char tagType, FILE * f, int idSize) {
 	unsigned char buff[TAG_HEADER_SIZE];
 	unsigned char * buffPointer = buff;
 	size_t chunksRead;
-	fprintf(stdout, "tag type: %d\n", (int)tagType);
+	//fprintf(stdout, "tag type: %d\n", (int)tagType);
 
 	chunksRead = fread(buff, TAG_HEADER_SIZE, 1, f);
 	if (chunksRead != 1) {
@@ -109,15 +109,17 @@ int printTag(unsigned char tagType, FILE * f, int idSize) {
 			TAG_HEADER_SIZE, (int)chunksRead
 		);
 	}
+	/* for debugging
 	fprintf(stdout, "char array: %d %d %d %d         %d %d %d %d\n",
 		buff[0], buff[1], buff[2], buff[3],
 		buff[4], buff[5], buff[6], buff[7]
 	);
+	*/
 
 	unsigned int microsSince = fromBigEndianStreamToInt(buffPointer);
-	fprintf(stdout, "micros since start: %d\n", microsSince);
+	fprintf(stdout, "microsSinceStart:%d, ", microsSince);
 	unsigned int dataLength = fromBigEndianStreamToInt(buffPointer +4);
-	fprintf(stdout, "data length: %d\n", dataLength);
+	//fprintf(stdout, "data length: %d\n", dataLength);
 	
 	return selectAndProcessTag(tagType, makeTagInfo(f, dataLength, idSize));
 } 

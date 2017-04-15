@@ -65,7 +65,6 @@ int selectAndProcessTag(unsigned char tagType, TagInfo tagInfo) {
 * [u1]* UTF8 characters for string (NOT NULL terminated)
 */
 int processTagString(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_STRING\n");
 	unsigned long long id;
 	if (getId(tagInfo.stream, tagInfo.idSize, &id) != 0) {
 		return -1;
@@ -80,7 +79,7 @@ int processTagString(TagInfo tagInfo) {
 	if (fread(str, strLen - 1, 1, tagInfo.stream) != 1) {
 		fprintf(stderr, "expected to read %d bytes for TAG_STRING's string, but failed\n", strLen - 1);
 	}
-	fprintf(stdout, "str: %s\n", str);
+	fprintf(stdout, "TAG_STRING: %s\n", str);
 	free(str);
 	return 0;
 }
@@ -92,7 +91,6 @@ int processTagString(TagInfo tagInfo) {
 * ID class name string ID
 */
 int processTagLoadClass(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_LOAD_CLASS\n");
 	unsigned int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_LOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -123,10 +121,9 @@ int processTagLoadClass(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "classSerialNumber: %d\n", classSerialNumber);
-	fprintf(stdout, "classObjId: %lld\n", classObjId);
-	fprintf(stdout, "stackTraceSerialNumber: %d\n", stackTraceSerialNumber);
-	fprintf(stdout, "classNameStringId: %lld\n", classNameStringId);
+	fprintf(stdout, "TAG_LOAD_CLASS: classSerialNumber:%d, classObjId:%lld, stackTraceSerialNumber:%d, classNameStringId:%lld\n",
+		classSerialNumber, classObjId, stackTraceSerialNumber, classNameStringId
+	);
 
 	return 0;
 }
@@ -135,9 +132,6 @@ int processTagLoadClass(TagInfo tagInfo) {
 * u4 class serial number
 */
 int processTagUnloadClass(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_UNLOAD_CLASS\n");
-
-
 	int totalRequiredBytes = 1 * 4;
 	if (tagInfo.dataLength != totalRequiredBytes) {
 		fprintf(stderr, "TAG_UNLOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -149,7 +143,7 @@ int processTagUnloadClass(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "classSerialNumber: %d\n", classSerialNumber);
+	fprintf(stdout, "TAG_UNLOAD_CLASS: classSerialNumber: %d\n", classSerialNumber);
 
 	return 0;
 }
@@ -167,7 +161,6 @@ int processTagUnloadClass(TagInfo tagInfo) {
 *    = -3 native method (Not implemented)
 */
 int processTagStackFrame(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_STACK_FRAME\n");
 	int totalRequiredBytes = 2 * 4 + 4 * tagInfo.idSize;
 	if (tagInfo.dataLength != totalRequiredBytes) {
 		fprintf(stderr, "TAG_STACK_FRAME required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -214,12 +207,8 @@ int processTagStackFrame(TagInfo tagInfo) {
 	}
 
 
-	fprintf(stdout, "stackFrameId:            %lld\n", stackFrameId);
-	fprintf(stdout, "methodNameStringId:      %lld\n", methodNameStringId);
-	fprintf(stdout, "methodSignatureStringId: %lld\n", methodSignatureStringId);
-	fprintf(stdout, "sourceFileNameStringId:  %lld\n", sourceFileNameStringId);
-	fprintf(stdout, "classSerialNumber:       %d\n", classSerialNumber);
-	fprintf(stdout, "lineInfo:                %d\n", lineInfo);
+	fprintf(stdout, "TAG_STACK_FRAME stackFrameId:%lld, methodNameStringId:%lld, methodSignatureStringId:%lld, sourceFileNameStringId:%lld, classSerialNumber:%d, lineInfo:%d\n",
+		stackFrameId, methodNameStringId, methodSignatureStringId, sourceFileNameStringId, classSerialNumber, lineInfo);
 
 	return 0;
 }
@@ -231,7 +220,6 @@ int processTagStackFrame(TagInfo tagInfo) {
 * [ID]* series of stack frame ID's
 */
 int processTagStackTrace(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_STACK_TRACE\n");
 	unsigned int totalRequiredBytes = 3 * 4;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -253,9 +241,8 @@ int processTagStackTrace(TagInfo tagInfo) {
 		fprintf(stderr, "unable to read u4 numberOfFrames for TAG_STACK_FRAME\n");
 		return -1;
 	}
-
-	fprintf(stdout, "stackTraceSerialNumber:   %d\n", stackTraceSerialNumber);
-	fprintf(stdout, "threadSerialNumber:       %d\n", threadSerialNumber);
+	
+	fprintf(stdout, "TAG_STACK_TRACE: stackTraceSerialNumber:%d, threadSerialNumber:%d\n", stackTraceSerialNumber, threadSerialNumber);
 
 	int dataLeft = tagInfo.dataLength - totalRequiredBytes;
 	if (dataLeft != numberOfFrames * tagInfo.idSize) {
@@ -280,7 +267,7 @@ int processTagStackTraceFrame(TagInfo tagInfo) {
 		fprintf(stderr, "unable to read %d bytes stackFrameId for TAG_STACK_FRAME\n", tagInfo.idSize);
 		return -1;
 	}
-	fprintf(stdout, "stackFrameId:  %lld\n", stackFrameId);
+	fprintf(stdout, "\tstackFrameId:%lld\n", stackFrameId);
 	return 0;
 }
 
@@ -306,7 +293,6 @@ int processTagStackTraceFrame(TagInfo tagInfo) {
 *     u4 number of instances allocated
 */
 int processTagAllocSites(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_ALLOC_SITES\n");
 	unsigned int totalRequiredBytes = 4 * 4 + 8 * 2;
 	if (tagInfo.dataLength < totalRequiredBytes) {
 		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -347,13 +333,9 @@ int processTagAllocSites(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "gcFlags:                 %d\n", gcFlags);
-	fprintf(stdout, "rawCutoffRatio:          %d\n", rawCutoffRatio);
-	fprintf(stdout, "cutoffRatio:             %f\n", cutoffRatio);
-	fprintf(stdout, "totalLiveBytes:          %d\n", totalLiveBytes);
-	fprintf(stdout, "totalLiveInstances:      %d\n", totalLiveInstances);
-	fprintf(stdout, "totalBytesAllocated:     %lld\n", totalBytesAllocated);
-	fprintf(stdout, "totalInstancesAllocated: %lld\n", totalInstancesAllocated);
+	fprintf(stdout, "TAG_ALLOC_SITES: gcFlags:%d, rawCutoffRatio:%d, cutoffRatio:%f, totalLiveBytes:%d, totalLiveInstances:%d, totalBytesAllocated:%lld, totalInstancesAllocated: %lld\n",
+		gcFlags, rawCutoffRatio, cutoffRatio, totalLiveInstances, totalLiveBytes, totalBytesAllocated, totalInstancesAllocated
+	);
 
 	
 	unsigned int numberOfSites;
@@ -389,44 +371,49 @@ int processTagAllocSites(TagInfo tagInfo) {
 */
 int processATagAllocSite(TagInfo tagInfo) {
 	unsigned int arrayIndicator;
+	unsigned int classSerialNumber;
+	unsigned int stackTraceSerialNumber;
+	unsigned int numberLiveBytes;
+	unsigned int numberLiveInstances;
+	unsigned int numberBytesAllocated;
+	unsigned int numberInstancesAllocated;
+
 	if (readByteToInt(tagInfo.stream, &arrayIndicator) != 0) {
 		fprintf(stderr, "unable to read u1 arrayIndicator for TAG_ALLOC_SITES\n");
 		return -1;
 	}
 
 
-	unsigned int classSerialNumber;
 	if (readBigEndianStreamToInt(tagInfo.stream, &classSerialNumber) != 0) {
 		fprintf(stderr, "unable to read u4 classSerialNumber for TAG_ALLOC_SITES\n");
 		return -1;
 	}
-	unsigned int stackTraceSerialNumber;
 	if (readBigEndianStreamToInt(tagInfo.stream, &stackTraceSerialNumber) != 0) {
 		fprintf(stderr, "unable to read u4 stackTraceSerialNumber for TAG_ALLOC_SITES\n");
 		return -1;
 	}
 
-	unsigned int numberLiveBytes;
 	if (readBigEndianStreamToInt(tagInfo.stream, &numberLiveBytes) != 0) {
 		fprintf(stderr, "unable to read u4 numberLiveBytes for TAG_ALLOC_SITES\n");
 		return -1;
 	}
-	unsigned int numberLiveInstances;
 	if (readBigEndianStreamToInt(tagInfo.stream, &numberLiveInstances) != 0) {
 		fprintf(stderr, "unable to read u4 numberLiveInstances for TAG_ALLOC_SITES\n");
 		return -1;
 	}
 
-	unsigned int numberBytesAllocated;
 	if (readBigEndianStreamToInt(tagInfo.stream, &numberBytesAllocated) != 0) {
 		fprintf(stderr, "unable to read u4 numberBytesAllocated for TAG_ALLOC_SITES\n");
 		return -1;
 	}
-	unsigned int numberInstancesAllocated;
 	if (readBigEndianStreamToInt(tagInfo.stream, &numberInstancesAllocated) != 0) {
 		fprintf(stderr, "unable to read u4 numberInstancesAllocated for TAG_ALLOC_SITES\n");
 		return -1;
 	}
+
+	fprintf(stdout, "\tarrayIndicator:%d, classSerialNumber:%d, stackTraceSerialNumber:%d, numberLiveBytes:%d, numberLiveInstances:%d, numberBytesAllocated:%d, numberInstancesAllocated:%d\n",
+		arrayIndicator, classSerialNumber, stackTraceSerialNumber, numberLiveBytes, numberLiveInstances, numberBytesAllocated, numberInstancesAllocated
+	);
 
 	return 0;
 }
@@ -438,7 +425,6 @@ int processATagAllocSite(TagInfo tagInfo) {
 * u8 total instances allocated
 */
 int processTagHeapSummary(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_HEAP_SUMMARY\n");
 	int totalRequiredBytes = 2 * 4 + 2 * 8;
 	if (tagInfo.dataLength != totalRequiredBytes) {
 		fprintf(stderr, "TAG_HEAP_SUMMARY required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -469,11 +455,9 @@ int processTagHeapSummary(TagInfo tagInfo) {
 		return -1;
 	}
 
-
-	fprintf(stdout, "totalLiveBytes:          %d\n", totalLiveBytes);
-	fprintf(stdout, "totalLiveInstances:      %d\n", totalLiveInstances);
-	fprintf(stdout, "totalBytesAllocated:     %lld\n", totalBytesAllocated);
-	fprintf(stdout, "totalInstancesAllocated: %lld\n", totalInstancesAllocated);
+	fprintf(stdout, "TAG_HEAP_SUMMARY: totalLiveBytes:%d, totalLiveInstances:%d, totalBytesAllocated:%lld, totalInstancesAllocated:%lld\n",
+		totalLiveBytes, totalLiveInstances, totalBytesAllocated, totalInstancesAllocated
+	);
 
 	return 0;
 }
@@ -487,7 +471,6 @@ ID thread group name ID
 ID thread parent group name ID
 */
 int processTagStartThread(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_START_THREAD\n");
 	int totalRequiredBytes = 2 * 4 + 4 * tagInfo.idSize;
 	if (tagInfo.dataLength != totalRequiredBytes) {
 		fprintf(stderr, "TAG_START_THREAD required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -526,13 +509,9 @@ int processTagStartThread(TagInfo tagInfo) {
 		return -1;
 	}
 
-
-	fprintf(stdout, "threadSerialNumber:      %d\n", threadSerialNumber);
-	fprintf(stdout, "threadObjectId:     %lld\n", threadObjectId);
-	fprintf(stdout, "stackTraceSerialNumber:      %d\n", stackTraceSerialNumber);
-	fprintf(stdout, "threadNameStringId:     %lld\n", threadNameStringId);
-	fprintf(stdout, "threadGroupNameId:     %lld\n", threadGroupNameId);
-	fprintf(stdout, "threadParentGroupNameId:     %lld\n", threadParentGroupNameId);
+	fprintf(stdout, "TAG_START_THREAD: threadSerialNumber:%d, threadObjectId:%lld, stackTraceSerialNumber:%d, threadNameStringId:%lld, threadGroupNameId:%lld, threadParentGroupNameId:%lld\n",
+		threadSerialNumber, threadObjectId, stackTraceSerialNumber, threadNameStringId, threadGroupNameId, threadParentGroupNameId
+	);
 
 	return 0;
 }
@@ -541,7 +520,6 @@ int processTagStartThread(TagInfo tagInfo) {
 u4 thread serial number
 */
 int processTagEndThread(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_END_THREAD\n");
 	int totalRequiredBytes = 1 * 4;
 	if (tagInfo.dataLength != totalRequiredBytes) {
 		fprintf(stderr, "TAG_END_THREAD required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -553,7 +531,7 @@ int processTagEndThread(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "threadSerialNumber:      %d\n", threadSerialNumber);
+	fprintf(stdout, "TAG_END_THREAD: threadSerialNumber:%d\n", threadSerialNumber);
 
 	return 0;
 }
@@ -597,7 +575,6 @@ u4 number of traces that follow:
     u4 stack trace serial number
 */
 int processTagCpuSamples(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_CPU_SAMPLES\n");
 	unsigned int totalRequiredBytes = 2*4;
 	if (tagInfo.dataLength >= totalRequiredBytes) {
 		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -620,7 +597,7 @@ int processTagCpuSamples(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "numberOfSamples:      %d\n", numberOfSamples);
+	fprintf(stdout, "TAG_CPU_SAMPLES: numberOfSamples:%d, numberOfTraces:%d\n", numberOfSamples, numberOfTraces);
 
 	for (unsigned int i = 0; i < numberOfTraces; i++) {
 		int errorCode = processTagCpuSampleTrace(tagInfo);
@@ -649,9 +626,7 @@ int processTagCpuSampleTrace(TagInfo tagInfo) {
 		return -1;
 	}
 
-	fprintf(stdout, "numberOfSamples:        %d\n", numberOfSamples);
-	fprintf(stdout, "stackTraceSerialNumber: %d\n", stackTraceSerialNumber);
-
+	fprintf(stdout, "\t numberOfSamples:%d, stackTraceSerialNumber:%d\n", numberOfSamples, stackTraceSerialNumber);
 
 	return 0;
 }
@@ -665,7 +640,6 @@ u4 Bit mask flags:
 u2 stack trace depth
 */
 int processTagControlSettings(TagInfo tagInfo) {
-	fprintf(stdout, "TAG_CONTROL_SETTINGS\n");
 	int totalRequiredBytes = 4 + 2;
 	if (tagInfo.dataLength != totalRequiredBytes) {
 		fprintf(stderr, "TAG_CONTROL_SETTINGS required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
@@ -682,9 +656,7 @@ int processTagControlSettings(TagInfo tagInfo) {
 		return -1;
 	}
 
-
-	fprintf(stdout, "controlMask:      %d\n", controlMask);
-	fprintf(stdout, "stackTraceDepth:      %d\n", stackTraceDepth);
+	fprintf(stdout, "TAG_CONTROL_SETTINGS: controlMask:%d, stackTraceDepth%d\n", controlMask, stackTraceDepth);
 
 	return 0;
 }
