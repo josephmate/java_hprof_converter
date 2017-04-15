@@ -19,6 +19,7 @@ int processHeapClassDump(TagInfo * tagInfo);
 int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry);
 int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry);
 int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * source);
+int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry);
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
@@ -154,7 +155,7 @@ int processTagHeap(TagInfo tagInfo) {
 		case HEAP_DUMP_END:
 			return 0;
 		default:
-			fprintf(stdout, "tag not recognized or implemented: %d", tagType);
+			fprintf(stdout, "HEAP TAG not recognized or implemented: %d\n", tagType);
 			return iterateThroughStream(tagInfo.stream, tagInfo.dataLength);
 		}
 	}
@@ -500,8 +501,6 @@ int processHeapClassDump(TagInfo * tagInfo) {
 	// 2 u4
 	// 1 u2
 	tagInfo->dataLength = tagInfo->dataLength - 7 * tagInfo->idSize - 2 * 4 - 1 * 2;
-
-
 	// iterate over constant pool
 	for (unsigned int i = 0; i < sizeOfConstantPool; i++) {
 		errCode = processConstantPoolRecord(tagInfo, i);
@@ -509,6 +508,7 @@ int processHeapClassDump(TagInfo * tagInfo) {
 			return errCode;
 		}
 	}
+
 
 	unsigned int numStaticFieldRecords;
 	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &numStaticFieldRecords);
@@ -518,6 +518,7 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		fprintf(stderr, "Could not obtain numStaticFieldRecords of HEAP_CLASS_DUMP\n");
 		return errCode;
 	}
+	// iterate over static field records
 	for (unsigned int i = 0; i < numStaticFieldRecords; i++) {
 		errCode = processStaticFieldRecord(tagInfo, i);
 		if (errCode != 0) {
@@ -526,9 +527,23 @@ int processHeapClassDump(TagInfo * tagInfo) {
 	}
 	
 
-	errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned int numInstanceFields;
+	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &numInstanceFields);
+	tagInfo->dataLength = tagInfo->dataLength - 2;
+	fprintf(stdout, "\tnumInstanceFields:%d\n", numInstanceFields);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain numInstanceFields of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	// iterate over instance field records
+	for (unsigned int i = 0; i < numInstanceFields; i++) {
+		errCode = processInstanceFieldRecord(tagInfo, i);
+		if (errCode != 0) {
+			return errCode;
+		}
+	}
+
+	return 0;
 }
 
 /*
@@ -549,8 +564,7 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 	tagInfo->dataLength = tagInfo->dataLength - 2 - 1;
 
 	errCode = processBasicTypeValue(tagInfo, entry, "processConstantPoolRecord");
-
-	return 0;
+	return errCode;
 }
 
 /*
@@ -571,10 +585,8 @@ int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry) {
 	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize - 1;
 
 	errCode = processBasicTypeValue(tagInfo, entry, "processStaticFieldRecord");
-
-	return 0;
+	return errCode;
 }
-
 
 /*
 BASIC TYPES
@@ -605,7 +617,6 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 	switch (typeOfEntry) {
 
 	case BASIC_TYPE_BOOLEAN:
-	case BASIC_TYPE_CHAR:
 	case BASIC_TYPE_BYTE:
 		errCode = readByteToInt(tagInfo->stream, &oneToFourByteValue);
 		if (errCode != 0) {
@@ -617,6 +628,7 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 		break;
 
 
+	case BASIC_TYPE_CHAR:
 	case BASIC_TYPE_SHORT:
 		errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
 		if (errCode != 0) {
@@ -654,18 +666,54 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 			fprintf(stdout, "value:%lld\n", eightByteValue);
 		}
 		else {
-			fprintf(stdout, "value:%Le\n", (long double)oneToFourByteValue);
+			fprintf(stdout, "value:%Le\n", (long double)eightByteValue);
 		}
 		tagInfo->dataLength = tagInfo->dataLength - 8;
 		break;
 	case BASIC_TYPE_OBJECT:
-		// TODO
+		errCode = getId(tagInfo->stream, tagInfo->idSize, &eightByteValue);
+		tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize;
+		if (errCode != 0) {
+			fprintf(stderr, "\nCould not obtain BASIC_TYPE_OBJECT entry %d of %s\n", entry, source);
+			return errCode;
+		}
+		fprintf(stdout, "value:%lld\n", eightByteValue);
 		break;
 	default:
 		fprintf(stderr, "\ntypeOfEntry %d not recognized entry %d of %s\n", typeOfEntry, entry, source);
 		return -1;
 		break;
 	}
+
+	return 0;
+}
+
+
+/*
+ID field name string ID
+u1 type of field : (See Basic Type)
+*/
+int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry) {
+	unsigned long long instanceFieldNameId;
+	unsigned int typeOfEntry;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &instanceFieldNameId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain instanceFieldNameId entry %d of processInstanceFieldRecord\n", entry);
+		return errCode;
+	}
+
+	errCode = readByteToInt(tagInfo->stream, &typeOfEntry);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain typeOfEntry entry %d of processInstanceFieldRecord\n", entry);
+		return errCode;
+	}
+
+	fprintf(stdout, "\tinstanceFieldNameId:%lld, typeOfEntry:%d\n", instanceFieldNameId, typeOfEntry);
+	tagInfo->dataLength = 
+		tagInfo->dataLength
+		- 1 * tagInfo->idSize
+		- 1 * 1;
 
 	return 0;
 }
