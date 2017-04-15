@@ -744,11 +744,48 @@ ID array class object ID
 [ID] * elements
 */
 int processHeapObjectArrayDump(TagInfo * tagInfo) {
-	// TODO
-	fprintf(stdout, "HEAP_OBJECT_ARRAY_DUMP\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long arrayObjId;
+	unsigned int stackTraceSerialNumber;
+	unsigned int numOfElements;
+	unsigned long long arrayClassObjId;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &arrayObjId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain arrayObjId of HEAP_OBJECT_ARRAY_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &stackTraceSerialNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain stackTraceSerialNumber of HEAP_PRIMITIVE_ARRAY_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &numOfElements);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain numOfElements of HEAP_PRIMITIVE_ARRAY_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &arrayClassObjId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain arrayClassObjId of HEAP_OBJECT_ARRAY_DUMP\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_OBJECT_ARRAY_DUMP: arrayObjId:%lld, stackTraceSerialNumber:%d, numOfElements:%d, arrayClassObjId:%lld\n",
+		arrayObjId, stackTraceSerialNumber, numOfElements, arrayClassObjId
+	);
+	tagInfo->dataLength =
+		tagInfo->dataLength
+		- 2 * tagInfo->idSize
+		- 2 * 4;
+
+	for (unsigned int i = 0; i < numOfElements; i++) {
+		errCode = processHeapPrimitiveArrayRecord(tagInfo, BASIC_TYPE_OBJECT, i, "HEAP_OBJECT_ARRAY_DUMP");
+		if (errCode != 0) {
+			return errCode;
+		}
+	}
+
+	return 0;
 }
 
 /*
@@ -793,10 +830,10 @@ int processHeapPrimitiveArrayDump(TagInfo * tagInfo) {
 	tagInfo->dataLength =
 		tagInfo->dataLength
 		- 1 * tagInfo->idSize
-		- 2 * 4;
+		- 2 * 4
 		- 1 * 1;
 
-		for (unsigned int i = 0; i < numOfElements; i++) {
+	for (unsigned int i = 0; i < numOfElements; i++) {
 		errCode = processHeapPrimitiveArrayRecord(tagInfo, typeOfEntry, i, "HEAP_PRIMITIVE_ARRAY_DUMP");
 		if (errCode != 0) {
 			return errCode;
