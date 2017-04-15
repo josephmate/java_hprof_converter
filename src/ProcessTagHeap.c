@@ -17,6 +17,8 @@ int processHeapRootThreadObject(TagInfo * tagInfo);
 int processHeapRootThreadObject(TagInfo * tagInfo);
 int processHeapClassDump(TagInfo * tagInfo);
 int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry);
+int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry);
+int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * source);
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
@@ -487,7 +489,7 @@ int processHeapClassDump(TagInfo * tagInfo) {
 	}
 	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &sizeOfConstantPool);
 	if (errCode != 0) {
-		fprintf(stderr, "Could not obtain classObjId of HEAP_CLASS_DUMP\n");
+		fprintf(stderr, "Could not obtain sizeOfConstantPool of HEAP_CLASS_DUMP\n");
 		return errCode;
 	}
 	fprintf(stdout,
@@ -508,6 +510,22 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		}
 	}
 
+	unsigned int numStaticFieldRecords;
+	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &numStaticFieldRecords);
+	tagInfo->dataLength = tagInfo->dataLength - 2;
+	fprintf(stdout, "\tnumStaticFieldRecords:%d\n", numStaticFieldRecords);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain numStaticFieldRecords of HEAP_CLASS_DUMP\n");
+		return errCode;
+	}
+	for (unsigned int i = 0; i < numStaticFieldRecords; i++) {
+		errCode = processStaticFieldRecord(tagInfo, i);
+		if (errCode != 0) {
+			return errCode;
+		}
+	}
+	
+
 	errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
 	tagInfo->dataLength = 0;
 	return errCode;
@@ -517,37 +535,72 @@ int processHeapClassDump(TagInfo * tagInfo) {
 	u2 constant pool index
 	u1 type of entry : (See Basic Type)
 	value value of entry(u1, u2, u4, or u8 based on type of entry)
-
-	BASIC TYPES
-	2 object
-	4 boolean
-	5 char
-	6 float
-	7 double
-	8 byte
-	9 short
-	10 int
-	11 long
 */
 int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 	unsigned int constantPoolIndex;
-	unsigned int typeOfEntry;
-	unsigned int oneToFourByteValue;
-	unsigned long long eightByteValue;
 
 	int errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &constantPoolIndex);
 	if (errCode != 0) {
 		fprintf(stderr, "Could not obtain constantPoolIndex entry %d of processConstantPoolRecord\n", entry);
 		return errCode;
 	}
-	errCode = readByteToInt(tagInfo->stream, &typeOfEntry);
+
+	fprintf(stdout, "\tconstantPoolIndex:%d, ", constantPoolIndex);
+	tagInfo->dataLength = tagInfo->dataLength - 2 - 1;
+
+	errCode = processBasicTypeValue(tagInfo, entry, "processConstantPoolRecord");
+
+	return 0;
+}
+
+/*
+ID static field name string ID
+u1 type of field : (See Basic Type)
+value value of entry(u1, u2, u4, or u8 based on type of field)
+*/
+int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry) {
+	unsigned long long staticFieldNameId;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &staticFieldNameId);
 	if (errCode != 0) {
-		fprintf(stderr, "Could not obtain typeOfEntry entry %d of processConstantPoolRecord\n", entry);
+		fprintf(stderr, "Could not obtain staticFieldNameId entry %d of processStaticFieldRecord\n", entry);
 		return errCode;
 	}
 
-	fprintf(stdout, "\tconstantPoolIndex:%d, typeOfEntry:%d, ", constantPoolIndex, typeOfEntry);
-	tagInfo->dataLength = tagInfo->dataLength - 2 - 1;
+	fprintf(stdout, "\tstaticFieldNameId:%lld, ", staticFieldNameId);
+	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize - 1;
+
+	errCode = processBasicTypeValue(tagInfo, entry, "processStaticFieldRecord");
+
+	return 0;
+}
+
+
+/*
+BASIC TYPES
+2 object
+4 boolean
+5 char
+6 float
+7 double
+8 byte
+9 short
+10 int
+11 long
+*/
+int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * source) {
+	unsigned int typeOfEntry;
+	unsigned int oneToFourByteValue;
+	unsigned long long eightByteValue;
+	int errCode;
+
+	errCode = readByteToInt(tagInfo->stream, &typeOfEntry);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain typeOfEntry entry %d of %s\n", entry, source);
+		return errCode;
+	}
+
+	fprintf(stdout, "typeOfEntry:%d, ", typeOfEntry);
 
 	switch (typeOfEntry) {
 
@@ -556,7 +609,7 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 	case BASIC_TYPE_BYTE:
 		errCode = readByteToInt(tagInfo->stream, &oneToFourByteValue);
 		if (errCode != 0) {
-			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
 			return errCode;
 		}
 		fprintf(stdout, "value:%d\n", oneToFourByteValue);
@@ -567,7 +620,7 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 	case BASIC_TYPE_SHORT:
 		errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
 		if (errCode != 0) {
-			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
 			return errCode;
 		}
 		fprintf(stdout, "value:%d\n", oneToFourByteValue);
@@ -575,15 +628,16 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 		break;
 
 	case BASIC_TYPE_FLOAT:
-	case BASIC_TYPE_INT :
+	case BASIC_TYPE_INT:
 		errCode = readBigEndianStreamToInt(tagInfo->stream, &oneToFourByteValue);
 		if (errCode != 0) {
-			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
 			return errCode;
 		}
 		if (typeOfEntry == BASIC_TYPE_INT) {
 			fprintf(stdout, "value:%d\n", oneToFourByteValue);
-		} else {
+		}
+		else {
 			fprintf(stdout, "value:%f\n", (float)oneToFourByteValue);
 		}
 		tagInfo->dataLength = tagInfo->dataLength - 4;
@@ -593,7 +647,7 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 	case BASIC_TYPE_LONG:
 		errCode = readBigWordSmallWordBigEndianStreamToLong(tagInfo->stream, &eightByteValue);
 		if (errCode != 0) {
-			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of processConstantPoolRecord\n", typeOfEntry, entry);
+			fprintf(stderr, "\nCould not obtain typeOfEntry %d entry %d of %s\n", typeOfEntry, entry, source);
 			return errCode;
 		}
 		if (typeOfEntry == BASIC_TYPE_LONG) {
@@ -605,8 +659,11 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 		tagInfo->dataLength = tagInfo->dataLength - 8;
 		break;
 	case BASIC_TYPE_OBJECT:
+		// TODO
 		break;
 	default:
+		fprintf(stderr, "\ntypeOfEntry %d not recognized entry %d of %s\n", typeOfEntry, entry, source);
+		return -1;
 		break;
 	}
 
