@@ -728,11 +728,47 @@ u4 number of bytes that follow
 	[value] * instance field values(this class, followed by super class, etc)
 */
 int processHeapInstanceDump(TagInfo * tagInfo) {
-	// TODO
-	fprintf(stdout, "HEAP_INSTANCE_DUMP\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int stackTraceSerialNumber;
+	unsigned long long classobjectId;
+	unsigned int numOfBytes;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &stackTraceSerialNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain stackTraceSerialNumber of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &classobjectId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain classobjectId of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &numOfBytes);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain numOfBytes of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_INSTANCE_DUMP objId:%lld, stackTraceSerialNumber:%d, classobjectId:%lld, numOfBytes:%d\n",
+		objId, stackTraceSerialNumber, classobjectId, numOfBytes
+	);
+	tagInfo->dataLength = tagInfo->dataLength
+		- 2 * tagInfo->idSize
+		- 2 * 4;
+
+	errCode = iterateThroughStream(tagInfo->stream, numOfBytes);
+	// TODO build up the class model and use it to output the instance values
+	if (errCode != 0) {
+		return errCode;
+	}
+	tagInfo->dataLength = tagInfo->dataLength - numOfBytes;
+
+	return 0;
 }
 
 /*
