@@ -72,12 +72,12 @@ int processTagString(TagInfo tagInfo) {
 	fprintf(stdout, "id: %lld\n", id);
 	// idSize less because we already read idSize bytes from the stream
 	// +1 because we need a null character at the end
-	int strLen = tagInfo.dataLength - tagInfo.idSize + 1;
+	long long strLen = tagInfo.dataLength - tagInfo.idSize + 1;
 	char * str = (char*)malloc(sizeof(char)*strLen);
 	str[strLen - 1] = '\0';
 	//one less because last char is the null character
 	if (fread(str, strLen - 1, 1, tagInfo.stream) != 1) {
-		fprintf(stderr, "expected to read %d bytes for TAG_STRING's string, but failed\n", strLen - 1);
+		fprintf(stderr, "expected to read %lld bytes for TAG_STRING's string, but failed\n", strLen - 1);
 	}
 	fprintf(stdout, "TAG_STRING: %s\n", str);
 	free(str);
@@ -93,7 +93,7 @@ int processTagString(TagInfo tagInfo) {
 int processTagLoadClass(TagInfo tagInfo) {
 	unsigned int totalRequiredBytes = 2 * 4 + 2 * tagInfo.idSize;
 	if (tagInfo.dataLength < totalRequiredBytes) {
-		fprintf(stderr, "TAG_LOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_LOAD_CLASS required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
 	}
 
@@ -134,7 +134,7 @@ int processTagLoadClass(TagInfo tagInfo) {
 int processTagUnloadClass(TagInfo tagInfo) {
 	int totalRequiredBytes = 1 * 4;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_UNLOAD_CLASS required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_UNLOAD_CLASS required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 
 	unsigned int classSerialNumber;
@@ -163,7 +163,7 @@ int processTagUnloadClass(TagInfo tagInfo) {
 int processTagStackFrame(TagInfo tagInfo) {
 	int totalRequiredBytes = 2 * 4 + 4 * tagInfo.idSize;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_STACK_FRAME required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_STACK_FRAME required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 
 
@@ -222,7 +222,7 @@ int processTagStackFrame(TagInfo tagInfo) {
 int processTagStackTrace(TagInfo tagInfo) {
 	unsigned int totalRequiredBytes = 3 * 4;
 	if (tagInfo.dataLength < totalRequiredBytes) {
-		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_STACK_TRACE required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
 	}
 
@@ -244,9 +244,10 @@ int processTagStackTrace(TagInfo tagInfo) {
 	
 	fprintf(stdout, "TAG_STACK_TRACE: stackTraceSerialNumber:%d, threadSerialNumber:%d\n", stackTraceSerialNumber, threadSerialNumber);
 
-	int dataLeft = tagInfo.dataLength - totalRequiredBytes;
+	long long dataLeft = tagInfo.dataLength - totalRequiredBytes;
 	if (dataLeft != numberOfFrames * tagInfo.idSize) {
-		fprintf(stderr, "TAG_STACK_TRACE required %d bytes for frames but we only got %d.\n", totalRequiredBytes, dataLeft);
+		fprintf(stderr, "TAG_STACK_TRACE required %d bytes for frames but we only got %lld.\n", totalRequiredBytes, dataLeft);
+		return -1;
 	}
 
 	
@@ -295,7 +296,7 @@ int processTagStackTraceFrame(TagInfo tagInfo) {
 int processTagAllocSites(TagInfo tagInfo) {
 	unsigned int totalRequiredBytes = 4 * 4 + 8 * 2;
 	if (tagInfo.dataLength < totalRequiredBytes) {
-		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 		return -1;
 	}
 
@@ -343,10 +344,10 @@ int processTagAllocSites(TagInfo tagInfo) {
 		fprintf(stderr, "unable to read u4 numberOfFrames for TAG_ALLOC_SITES\n");
 		return -1;
 	}
-	unsigned int bytesLeft = tagInfo.dataLength - totalRequiredBytes;
+	long long bytesLeft = tagInfo.dataLength - totalRequiredBytes;
 	totalRequiredBytes = numberOfSites*(1 * 1 + 4 * 6);
 	if (bytesLeft < totalRequiredBytes) {
-		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes for frames but we only got %d.\n", totalRequiredBytes, bytesLeft);
+		fprintf(stderr, "TAG_ALLOC_SITES required %d bytes for frames but we only got %lld.\n", totalRequiredBytes, bytesLeft);
 	}
 
 	for (unsigned int i = 0; i < numberOfSites; i++) {
@@ -427,7 +428,7 @@ int processATagAllocSite(TagInfo tagInfo) {
 int processTagHeapSummary(TagInfo tagInfo) {
 	int totalRequiredBytes = 2 * 4 + 2 * 8;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_HEAP_SUMMARY required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_HEAP_SUMMARY required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 
 
@@ -473,7 +474,7 @@ ID thread parent group name ID
 int processTagStartThread(TagInfo tagInfo) {
 	int totalRequiredBytes = 2 * 4 + 4 * tagInfo.idSize;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_START_THREAD required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_START_THREAD required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 
 	unsigned int threadSerialNumber;
@@ -522,7 +523,7 @@ u4 thread serial number
 int processTagEndThread(TagInfo tagInfo) {
 	int totalRequiredBytes = 1 * 4;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_END_THREAD required %d bytes but we only got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_END_THREAD required %d bytes but we only got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 
 	unsigned int threadSerialNumber;
@@ -562,7 +563,7 @@ int processTagHeapDumpEnd(TagInfo tagInfo) {
 	fprintf(stdout, "TAG_HEAP_DUMP_END\n");
 	int totalRequiredBytes = 0;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_HEAP_DUMP_END required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_HEAP_DUMP_END required %d bytes but we got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 	return 0;
 }
@@ -577,7 +578,7 @@ u4 number of traces that follow:
 int processTagCpuSamples(TagInfo tagInfo) {
 	unsigned int totalRequiredBytes = 2*4;
 	if (tagInfo.dataLength >= totalRequiredBytes) {
-		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes but we got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 	
 	unsigned int numberOfSamples;
@@ -591,9 +592,9 @@ int processTagCpuSamples(TagInfo tagInfo) {
 		return -1;
 	}
 
-	int bytesLeft = tagInfo.dataLength - totalRequiredBytes;
+	long long bytesLeft = tagInfo.dataLength - totalRequiredBytes;
 	if (bytesLeft != 4 * 2 * numberOfTraces) {
-		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes for %d numberOfTraces but we got %d.\n", 4 * 2 * numberOfTraces, numberOfTraces, bytesLeft);
+		fprintf(stderr, "TAG_CPU_SAMPLES required %d bytes for %d numberOfTraces but we got %lld.\n", 4 * 2 * numberOfTraces, numberOfTraces, bytesLeft);
 		return -1;
 	}
 
@@ -642,7 +643,7 @@ u2 stack trace depth
 int processTagControlSettings(TagInfo tagInfo) {
 	int totalRequiredBytes = 4 + 2;
 	if (tagInfo.dataLength != totalRequiredBytes) {
-		fprintf(stderr, "TAG_CONTROL_SETTINGS required %d bytes but we got %d.\n", totalRequiredBytes, tagInfo.dataLength);
+		fprintf(stderr, "TAG_CONTROL_SETTINGS required %d bytes but we got %lld.\n", totalRequiredBytes, tagInfo.dataLength);
 	}
 
 	unsigned int controlMask;

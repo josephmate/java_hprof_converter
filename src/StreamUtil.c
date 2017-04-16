@@ -30,7 +30,7 @@ int readByteToInt(FILE * f, unsigned int * result) {
 	unsigned char buff[1];
 	size_t chunksRead = fread(buff, 1, 1, f);
 	if (chunksRead != 1) {
-		fprintf(stderr, "was unable to read a chunk of 2 bytes from the stream\n");
+		fprintf(stderr, "was unable to read a chunk of 1 bytes from the stream\n");
 		return -1;
 	}
 	*result = (unsigned int)buff[0];
@@ -74,7 +74,7 @@ int readBigWordSmallWordBigEndianStreamToLong(FILE * f, unsigned long long * res
 /**
 * Iterates through dataLength bytes of the stream: f.
 */
-int iterateThroughStream(FILE* f, int dataLength) {
+int iterateThroughStream(FILE* f, long long dataLength) {
 	unsigned char buff[1];
 	unsigned char * buffPointer = buff;
 	size_t numOfBytesRead;
@@ -82,7 +82,7 @@ int iterateThroughStream(FILE* f, int dataLength) {
 		numOfBytesRead = fread(buffPointer, 1, 1, f);
 		if (numOfBytesRead != 1) {
 			fprintf(stderr,
-				"Was reading data of tag entry. expected %d bytes, but failed on %d\n",
+				"Was reading data of tag entry. expected %lld bytes, but failed on %d\n",
 				dataLength, i
 			);
 			perror("The following error occurred:");

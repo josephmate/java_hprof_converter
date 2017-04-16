@@ -13,7 +13,7 @@ int readByteToInt(FILE * f, unsigned int * result);
 int readTwoByteBigEndianStreamToInt(FILE * f, unsigned int * result);
 int readBigEndianStreamToInt(FILE * data, unsigned int * result);
 int readBigWordSmallWordBigEndianStreamToLong(FILE * f, unsigned long long * result);
-int iterateThroughStream(FILE* f, int dataLength);
+int iterateThroughStream(FILE* f, long long dataLength);
 int getId(FILE * f, int idSize, unsigned long long * result);
 
 #endif

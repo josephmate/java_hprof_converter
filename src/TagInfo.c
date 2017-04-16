@@ -1,6 +1,6 @@
 #include "TagInfo.h"
 
-TagInfo makeTagInfo(FILE * f, int dataLength, int idSize)
+TagInfo makeTagInfo(FILE * f, long long dataLength, int idSize)
 {
 	TagInfo res;
 	res.stream = f;
