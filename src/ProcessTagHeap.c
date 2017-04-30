@@ -7,18 +7,20 @@ struct ClassInfo {
 	unsigned long long classId;
 	unsigned long long superClassObjId;
 	unsigned int numInstanceFields;
-	unsigned long long * instanceFieldNameId;
+	unsigned long long * instanceFieldNameIds;
 	unsigned int * typeOfFields;
 };
 typedef struct ClassInfo ClassInfo;
 
 /* Contains all the info necessary for tag processing */
 struct ClassHashEntry {
-	unsigned long long classid;
-	ClassInfo classInfo;
+	unsigned long long classId;
+	ClassInfo * classInfo;
 	UT_hash_handle hh; /* makes this structure hashable */
 };
 typedef struct ClassHashEntry ClassHashEntry;
+
+struct ClassHashEntry *classTable = NULL;
 
 #define HASH_FIND_LONG(head,findlong,out)                                          \
     HASH_FIND(hh,head,findlong,sizeof(long long),out)
@@ -39,7 +41,7 @@ int processHeapClassDump(TagInfo * tagInfo);
 int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry);
 int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry);
 int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * source);
-int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry);
+int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry, ClassInfo * classInfo);
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
@@ -578,19 +580,24 @@ int processHeapClassDump(TagInfo * tagInfo) {
 	classInfo->classId = classObjId;
 	classInfo->superClassObjId = superClassObjId;
 	classInfo->numInstanceFields = numInstanceFields;
-	classInfo->instanceFieldNameId = malloc(sizeof(long long)*numInstanceFields);
+	classInfo->instanceFieldNameIds = malloc(sizeof(long long)*numInstanceFields);
 	classInfo->typeOfFields = malloc(sizeof(unsigned int)*numInstanceFields);
 
 	// iterate over instance field records
 	for (unsigned int i = 0; i < numInstanceFields; i++) {
-		errCode = processInstanceFieldRecord(tagInfo, i);
+		errCode = processInstanceFieldRecord(tagInfo, i, classInfo);
 		if (errCode != 0) {
-			free(classInfo->instanceFieldNameId);
+			free(classInfo->instanceFieldNameIds);
 			free(classInfo->typeOfFields);
 			free(classInfo);
 			return errCode;
 		}
 	}
+
+	ClassHashEntry * classHashEntry = malloc(sizeof(ClassHashEntry));
+	classHashEntry->classId = classObjId;
+	classHashEntry->classInfo = classInfo;
+	HASH_ADD_LONG(classTable, classId, classHashEntry);
 
 	return 0;
 }
@@ -742,7 +749,7 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 ID field name string ID
 u1 type of field : (See Basic Type)
 */
-int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry) {
+int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry, ClassInfo * classInfo) {
 	unsigned long long instanceFieldNameId;
 	unsigned int typeOfEntry;
 
@@ -757,6 +764,9 @@ int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry) {
 		fprintf(stderr, "Could not obtain typeOfEntry entry %d of processInstanceFieldRecord\n", entry);
 		return errCode;
 	}
+
+	classInfo->instanceFieldNameIds[entry] = instanceFieldNameId;
+	classInfo->typeOfFields[entry] = typeOfEntry;
 
 	fprintf(stdout, "\tinstanceFieldNameId:%lld, typeOfEntry:%d\n", instanceFieldNameId, typeOfEntry);
 	tagInfo->dataLength = 
@@ -808,6 +818,26 @@ int processHeapInstanceDump(TagInfo * tagInfo) {
 	tagInfo->dataLength = tagInfo->dataLength
 		- 2 * tagInfo->idSize
 		- 2 * 4;
+
+	unsigned long long currentClassId = classobjectId;
+	ClassHashEntry * classHashEntry;
+	HASH_FIND_LONG(classTable, &currentClassId, classHashEntry);
+	if (classHashEntry == NULL) {
+		fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
+		return -1;
+	}
+	while (currentClassId != 0) {
+		ClassInfo * classInfo = classHashEntry->classInfo;
+
+		//TODO read through instance field data
+
+		currentClassId = classInfo->superClassObjId;
+		HASH_FIND_LONG(classTable, &currentClassId, classHashEntry);
+		if (classHashEntry == NULL) {
+			fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
+			return -1;
+		}
+	}
 
 	errCode = iterateThroughStream(tagInfo->stream, numOfBytes);
 	// TODO build up the class model and use it to output the instance values
