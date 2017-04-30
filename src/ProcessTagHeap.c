@@ -1,9 +1,29 @@
 #include "ProcessTagHeap.h"
 #include "StreamUtil.h"
 #include <stdlib.h>
+#include "lib/uthash.h"
 
+struct ClassInfo {
+	unsigned long long classId;
+	unsigned long long superClassObjId;
+	unsigned int numInstanceFields;
+	unsigned long long * instanceFieldNameId;
+	unsigned int * typeOfFields;
+};
+typedef struct ClassInfo ClassInfo;
 
+/* Contains all the info necessary for tag processing */
+struct ClassHashEntry {
+	unsigned long long classid;
+	ClassInfo classInfo;
+	UT_hash_handle hh; /* makes this structure hashable */
+};
+typedef struct ClassHashEntry ClassHashEntry;
 
+#define HASH_FIND_LONG(head,findlong,out)                                          \
+    HASH_FIND(hh,head,findlong,sizeof(long long),out)
+#define HASH_ADD_LONG(head,longfield,add)                                          \
+    HASH_ADD(hh,head,longfield,sizeof(long long),add)
 
 int processHeapRootUnknown(TagInfo * tagInfo);
 int processHeapRootJniGlobal(TagInfo * tagInfo);
@@ -66,7 +86,6 @@ BASIC TYPES
 int processTagHeap(TagInfo tagInfo) {
 	unsigned int tagType;
 	//long long bytesLastTime = tagInfo.dataLength;
-
 	while (tagInfo.dataLength > 0) {
 		int errCode = readByteToInt(tagInfo.stream, &tagType);
 		if (errCode != 0) {
@@ -547,7 +566,6 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		}
 	}
 	
-
 	unsigned int numInstanceFields;
 	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &numInstanceFields);
 	tagInfo->dataLength = tagInfo->dataLength - 2;
@@ -556,10 +574,20 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		fprintf(stderr, "Could not obtain numInstanceFields of HEAP_CLASS_DUMP\n");
 		return errCode;
 	}
+	ClassInfo * classInfo = malloc(sizeof(ClassInfo));
+	classInfo->classId = classObjId;
+	classInfo->superClassObjId = superClassObjId;
+	classInfo->numInstanceFields = numInstanceFields;
+	classInfo->instanceFieldNameId = malloc(sizeof(long long)*numInstanceFields);
+	classInfo->typeOfFields = malloc(sizeof(unsigned int)*numInstanceFields);
+
 	// iterate over instance field records
 	for (unsigned int i = 0; i < numInstanceFields; i++) {
 		errCode = processInstanceFieldRecord(tagInfo, i);
 		if (errCode != 0) {
+			free(classInfo->instanceFieldNameId);
+			free(classInfo->typeOfFields);
+			free(classInfo);
 			return errCode;
 		}
 	}

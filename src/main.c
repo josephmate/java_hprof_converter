@@ -57,8 +57,6 @@ int main()
 	}
 	// no more bytes to read
 	fprintf(stdout, "no more bytes to read\n");
-	
-	
     return 0;
 }
 
