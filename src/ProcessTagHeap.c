@@ -45,7 +45,7 @@ int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry, ClassInfo 
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
-int processHeapPrimitiveArrayRecord(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source);
+int extractTypeFromStream(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source);
 
 /*
 BASIC TYPES
@@ -777,6 +777,12 @@ int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry, ClassInfo 
 	return 0;
 }
 
+void outputTabs(int tabCount) {
+	for (int i = 0; i < tabCount; i++) {
+		fprintf(stdout, "\t");
+	}
+}
+
 /*
 HEAP_INSTANCE_DUMP
 ID object ID
@@ -812,8 +818,8 @@ int processHeapInstanceDump(TagInfo * tagInfo) {
 		return errCode;
 	}
 
-	fprintf(stdout, "HEAP_INSTANCE_DUMP objId:%lld, stackTraceSerialNumber:%d, classobjectId:%lld, numOfBytes:%d\n",
-		objId, stackTraceSerialNumber, classobjectId, numOfBytes
+	fprintf(stdout, "HEAP_INSTANCE_DUMP objId:%lld, stackTraceSerialNumber:%d, numOfBytes:%d\n",
+		objId, stackTraceSerialNumber, numOfBytes
 	);
 	tagInfo->dataLength = tagInfo->dataLength
 		- 2 * tagInfo->idSize
@@ -826,26 +832,41 @@ int processHeapInstanceDump(TagInfo * tagInfo) {
 		fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
 		return -1;
 	}
+	int tabCount = 1;
 	while (currentClassId != 0) {
 		ClassInfo * classInfo = classHashEntry->classInfo;
+		outputTabs(tabCount);
+		fprintf(stdout, "classobjectId:%lld\n", currentClassId);
 
 		//TODO read through instance field data
+		int numOfFields = classInfo->numInstanceFields;
+		for (int i = 0; i < numOfFields; i++) {
+			outputTabs(tabCount + 1);
+			fprintf(stdout, "instanceFieldNameIds:%lld\n", classInfo->instanceFieldNameIds[i]);
+			outputTabs(tabCount + 1);
+			fprintf(stdout, "type:%d\n", classInfo->typeOfFields[i]);
+			outputTabs(tabCount);
+			extractTypeFromStream(tagInfo, classInfo->typeOfFields[i], i, "processHeapInstanceDump");
+		}
 
 		currentClassId = classInfo->superClassObjId;
-		HASH_FIND_LONG(classTable, &currentClassId, classHashEntry);
-		if (classHashEntry == NULL) {
-			fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
-			return -1;
+		if (currentClassId != 0) {
+			HASH_FIND_LONG(classTable, &currentClassId, classHashEntry);
+			if (classHashEntry == NULL) {
+				fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
+				return -1;
+			}
 		}
+		tabCount++;
 	}
 
+	/*
 	errCode = iterateThroughStream(tagInfo->stream, numOfBytes);
-	// TODO build up the class model and use it to output the instance values
 	if (errCode != 0) {
 		return errCode;
 	}
 	tagInfo->dataLength = tagInfo->dataLength - numOfBytes;
-
+	*/
 	return 0;
 }
 
@@ -893,7 +914,7 @@ int processHeapObjectArrayDump(TagInfo * tagInfo) {
 		- 2 * 4;
 
 	for (unsigned int i = 0; i < numOfElements; i++) {
-		errCode = processHeapPrimitiveArrayRecord(tagInfo, BASIC_TYPE_OBJECT, i, "HEAP_OBJECT_ARRAY_DUMP");
+		errCode = extractTypeFromStream(tagInfo, BASIC_TYPE_OBJECT, i, "HEAP_OBJECT_ARRAY_DUMP");
 		if (errCode != 0) {
 			return errCode;
 		}
@@ -948,7 +969,7 @@ int processHeapPrimitiveArrayDump(TagInfo * tagInfo) {
 		- 1 * 1;
 
 	for (unsigned int i = 0; i < numOfElements; i++) {
-		errCode = processHeapPrimitiveArrayRecord(tagInfo, typeOfEntry, i, "HEAP_PRIMITIVE_ARRAY_DUMP");
+		errCode = extractTypeFromStream(tagInfo, typeOfEntry, i, "HEAP_PRIMITIVE_ARRAY_DUMP");
 		if (errCode != 0) {
 			return errCode;
 		}
@@ -969,7 +990,7 @@ BASIC TYPES
 10 int
 11 long
 */
-int processHeapPrimitiveArrayRecord(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source) {
+int extractTypeFromStream(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source) {
 	unsigned int oneToFourByteValue;
 	unsigned long long eightByteValue;
 	int errCode;
