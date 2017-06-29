@@ -1,9 +1,31 @@
 #include "ProcessTagHeap.h"
 #include "StreamUtil.h"
 #include <stdlib.h>
+#include "lib/uthash.h"
 
+struct ClassInfo {
+	unsigned long long classId;
+	unsigned long long superClassObjId;
+	unsigned int numInstanceFields;
+	unsigned long long * instanceFieldNameIds;
+	unsigned int * typeOfFields;
+};
+typedef struct ClassInfo ClassInfo;
 
+/* Contains all the info necessary for tag processing */
+struct ClassHashEntry {
+	unsigned long long classId;
+	ClassInfo * classInfo;
+	UT_hash_handle hh; /* makes this structure hashable */
+};
+typedef struct ClassHashEntry ClassHashEntry;
 
+struct ClassHashEntry *classTable = NULL;
+
+#define HASH_FIND_LONG(head,findlong,out)                                          \
+    HASH_FIND(hh,head,findlong,sizeof(long long),out)
+#define HASH_ADD_LONG(head,longfield,add)                                          \
+    HASH_ADD(hh,head,longfield,sizeof(long long),add)
 
 int processHeapRootUnknown(TagInfo * tagInfo);
 int processHeapRootJniGlobal(TagInfo * tagInfo);
@@ -19,11 +41,11 @@ int processHeapClassDump(TagInfo * tagInfo);
 int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry);
 int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry);
 int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * source);
-int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry);
+int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry, ClassInfo * classInfo);
 int processHeapInstanceDump(TagInfo * tagInfo);
 int processHeapObjectArrayDump(TagInfo * tagInfo);
 int processHeapPrimitiveArrayDump(TagInfo * tagInfo);
-int processHeapPrimitiveArrayRecord(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source);
+int extractTypeFromStream(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source);
 
 /*
 BASIC TYPES
@@ -65,15 +87,16 @@ BASIC TYPES
 #define HEAP_DUMP_END                0x2C
 int processTagHeap(TagInfo tagInfo) {
 	unsigned int tagType;
-
+	//long long bytesLastTime = tagInfo.dataLength;
 	while (tagInfo.dataLength > 0) {
 		int errCode = readByteToInt(tagInfo.stream, &tagType);
 		if (errCode != 0) {
-			fprintf(stderr, "could not read heap tag type. reached end of stream too early\n");
+			fprintf(stderr, "could not read heap tag type. reached end of stream too early. datalength:%lld\n", tagInfo.dataLength);
 			return errCode;
 		}
-		//fprintf(stdout, "heap tag type: %d \n", tagType);
 		tagInfo.dataLength = tagInfo.dataLength - 1;
+		//fprintf(stdout, "heap tag type: %d bytes left %lld, usedSinceLast%lld, usedSinceLastIgnoreTag:%lld \n", tagType, tagInfo.dataLength, bytesLastTime - tagInfo.dataLength, bytesLastTime - tagInfo.dataLength - 1);
+		//bytesLastTime = tagInfo.dataLength;
 		switch (tagType) {
 		case HEAP_ROOT_UNKNOWN:
 			errCode = processHeapRootUnknown(&tagInfo);
@@ -154,6 +177,7 @@ int processTagHeap(TagInfo tagInfo) {
 			}
 			break;
 		case HEAP_DUMP_END:
+			fprintf(stdout, "HEAP_DUMP_END\n");
 			return 0;
 		default:
 			fprintf(stdout, "HEAP TAG not recognized or implemented: %d\n", tagType);
@@ -161,8 +185,9 @@ int processTagHeap(TagInfo tagInfo) {
 		}
 	}
 
-	fprintf(stderr, "was expecting tag %d but never found\n", HEAP_DUMP_END);
-	return -1;
+	fprintf(stdout, "HEAP_DUMP_NO_MORE_BYTES\n");
+	//fprintf(stderr, "was expecting tag %d but never found\n", HEAP_DUMP_END);
+	return 0;
 }
 
 
@@ -180,7 +205,8 @@ int processHeapRootUnknown(TagInfo * tagInfo) {
 		return errCode;
 	}
 	fprintf(stdout, "HEAP_ROOT_UNKNOWN %lld\n", id);
-	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
+	tagInfo->dataLength = tagInfo->dataLength 
+		- tagInfo->idSize;
 	return errCode;
 }
 
@@ -207,7 +233,8 @@ int processHeapRootJniGlobal(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_JNI_GLOBAL objId:%lld jniGlobalRefId:%lld\n", objId, jniGlobalRefId);
 
-	tagInfo->dataLength = tagInfo->dataLength - 2*tagInfo->idSize;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 2 * tagInfo->idSize;
 	return errCode;
 }
 
@@ -242,7 +269,9 @@ int processHeapRootJniLocal(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_JNI_LOCAL objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
 
-	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 2 * 4;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 1 * tagInfo->idSize
+		- 2 * 4;
 	return 0;
 }
 
@@ -277,7 +306,9 @@ int processHeapRootJavaFrame(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_JAVA_FRAME objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
 
-	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 2 * 4;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 1 * tagInfo->idSize
+		- 2 * 4;
 	return 0;
 }
 
@@ -304,7 +335,9 @@ int processHeapRootNativeStack(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_NATIVE_STACK objId:%lld, threadSerialNum:%d\n", objId, threadSerialNum);
 
-	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 1 * 4;
+	tagInfo->dataLength = tagInfo->dataLength 
+		- 1 * tagInfo->idSize
+		- 1 * 4;
 	return 0;
 }
 
@@ -320,7 +353,8 @@ int processHeapRootStickyClass(TagInfo * tagInfo) {
 		return errCode;
 	}
 	fprintf(stdout, "HEAP_ROOT_STICKY_CLASS objId:%lld\n", id);
-	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 1 * tagInfo->idSize;
 	return errCode;
 }
 
@@ -347,7 +381,9 @@ int processHeapRootThreadBlock(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_THREAD_BLOCK objId:%lld, threadSerialNum:%d\n", objId, threadSerialNum);
 
-	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 1 * 4;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 1 * tagInfo->idSize
+		- 1 * 4;
 	return 0;
 }
 
@@ -356,7 +392,6 @@ HEAP_ROOT_MONITOR_USED
 ID object ID
 */
 int processHeapRootMonitorUsed(TagInfo * tagInfo) {
-	fprintf(stdout, "HEAP_ROOT_MONITOR_USED\n");
 	unsigned long long id;
 	int errCode = getId(tagInfo->stream, tagInfo->idSize, &id);
 	if (errCode != 0) {
@@ -364,7 +399,8 @@ int processHeapRootMonitorUsed(TagInfo * tagInfo) {
 		return errCode;
 	}
 	fprintf(stdout, "HEAP_ROOT_MONITOR_USED objId:%lld\n", id);
-	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 1 * tagInfo->idSize;
 	return errCode;
 }
 
@@ -400,7 +436,9 @@ int processHeapRootThreadObject(TagInfo * tagInfo) {
 
 	fprintf(stdout, "HEAP_ROOT_THREAD_OBJECT objId:%lld, threadSerialNum:%d, frameNumber:%d\n", objId, threadSerialNum, frameNumber);
 
-	tagInfo->dataLength = tagInfo->dataLength - 1 * tagInfo->idSize - 2 * 4;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 1 * tagInfo->idSize
+		- 2 * 4;
 	return 0;
 }
 
@@ -501,7 +539,10 @@ int processHeapClassDump(TagInfo * tagInfo) {
 	// 7 ID
 	// 2 u4
 	// 1 u2
-	tagInfo->dataLength = tagInfo->dataLength - 7 * tagInfo->idSize - 2 * 4 - 1 * 2;
+	tagInfo->dataLength = tagInfo->dataLength
+		- 7 * tagInfo->idSize
+		- 2 * 4
+		- 1 * 2;
 	// iterate over constant pool
 	for (unsigned int i = 0; i < sizeOfConstantPool; i++) {
 		errCode = processConstantPoolRecord(tagInfo, i);
@@ -527,7 +568,6 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		}
 	}
 	
-
 	unsigned int numInstanceFields;
 	errCode = readTwoByteBigEndianStreamToInt(tagInfo->stream, &numInstanceFields);
 	tagInfo->dataLength = tagInfo->dataLength - 2;
@@ -536,13 +576,28 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		fprintf(stderr, "Could not obtain numInstanceFields of HEAP_CLASS_DUMP\n");
 		return errCode;
 	}
+	ClassInfo * classInfo = malloc(sizeof(ClassInfo));
+	classInfo->classId = classObjId;
+	classInfo->superClassObjId = superClassObjId;
+	classInfo->numInstanceFields = numInstanceFields;
+	classInfo->instanceFieldNameIds = malloc(sizeof(long long)*numInstanceFields);
+	classInfo->typeOfFields = malloc(sizeof(unsigned int)*numInstanceFields);
+
 	// iterate over instance field records
 	for (unsigned int i = 0; i < numInstanceFields; i++) {
-		errCode = processInstanceFieldRecord(tagInfo, i);
+		errCode = processInstanceFieldRecord(tagInfo, i, classInfo);
 		if (errCode != 0) {
+			free(classInfo->instanceFieldNameIds);
+			free(classInfo->typeOfFields);
+			free(classInfo);
 			return errCode;
 		}
 	}
+
+	ClassHashEntry * classHashEntry = malloc(sizeof(ClassHashEntry));
+	classHashEntry->classId = classObjId;
+	classHashEntry->classInfo = classInfo;
+	HASH_ADD_LONG(classTable, classId, classHashEntry);
 
 	return 0;
 }
@@ -562,7 +617,7 @@ int processConstantPoolRecord(TagInfo * tagInfo, unsigned int entry) {
 	}
 
 	fprintf(stdout, "\tconstantPoolIndex:%d, ", constantPoolIndex);
-	tagInfo->dataLength = tagInfo->dataLength - 2 - 1;
+	tagInfo->dataLength = tagInfo->dataLength - 2;
 
 	errCode = processBasicTypeValue(tagInfo, entry, "processConstantPoolRecord");
 	return errCode;
@@ -583,7 +638,7 @@ int processStaticFieldRecord(TagInfo * tagInfo, unsigned int entry) {
 	}
 
 	fprintf(stdout, "\tstaticFieldNameId:%lld, ", staticFieldNameId);
-	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize - 1;
+	tagInfo->dataLength = tagInfo->dataLength - tagInfo->idSize;
 
 	errCode = processBasicTypeValue(tagInfo, entry, "processStaticFieldRecord");
 	return errCode;
@@ -694,7 +749,7 @@ int processBasicTypeValue(TagInfo * tagInfo, unsigned int entry, const char * so
 ID field name string ID
 u1 type of field : (See Basic Type)
 */
-int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry) {
+int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry, ClassInfo * classInfo) {
 	unsigned long long instanceFieldNameId;
 	unsigned int typeOfEntry;
 
@@ -710,6 +765,9 @@ int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry) {
 		return errCode;
 	}
 
+	classInfo->instanceFieldNameIds[entry] = instanceFieldNameId;
+	classInfo->typeOfFields[entry] = typeOfEntry;
+
 	fprintf(stdout, "\tinstanceFieldNameId:%lld, typeOfEntry:%d\n", instanceFieldNameId, typeOfEntry);
 	tagInfo->dataLength = 
 		tagInfo->dataLength
@@ -717,6 +775,12 @@ int processInstanceFieldRecord(TagInfo * tagInfo, unsigned int entry) {
 		- 1 * 1;
 
 	return 0;
+}
+
+void outputTabs(int tabCount) {
+	for (int i = 0; i < tabCount; i++) {
+		fprintf(stdout, "\t");
+	}
 }
 
 /*
@@ -728,11 +792,82 @@ u4 number of bytes that follow
 	[value] * instance field values(this class, followed by super class, etc)
 */
 int processHeapInstanceDump(TagInfo * tagInfo) {
-	// TODO
-	fprintf(stdout, "HEAP_INSTANCE_DUMP\n");
-	int errCode = iterateThroughStream(tagInfo->stream, tagInfo->dataLength);
-	tagInfo->dataLength = 0;
-	return errCode;
+	unsigned long long objId;
+	unsigned int stackTraceSerialNumber;
+	unsigned long long classobjectId;
+	unsigned int numOfBytes;
+
+	int errCode = getId(tagInfo->stream, tagInfo->idSize, &objId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain objId of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &stackTraceSerialNumber);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain stackTraceSerialNumber of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+	errCode = getId(tagInfo->stream, tagInfo->idSize, &classobjectId);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain classobjectId of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+	errCode = readBigEndianStreamToInt(tagInfo->stream, &numOfBytes);
+	if (errCode != 0) {
+		fprintf(stderr, "Could not obtain numOfBytes of HEAP_INSTANCE_DUMP\n");
+		return errCode;
+	}
+
+	fprintf(stdout, "HEAP_INSTANCE_DUMP objId:%lld, stackTraceSerialNumber:%d, numOfBytes:%d\n",
+		objId, stackTraceSerialNumber, numOfBytes
+	);
+	tagInfo->dataLength = tagInfo->dataLength
+		- 2 * tagInfo->idSize
+		- 2 * 4;
+
+	unsigned long long currentClassId = classobjectId;
+	ClassHashEntry * classHashEntry;
+	HASH_FIND_LONG(classTable, &currentClassId, classHashEntry);
+	if (classHashEntry == NULL) {
+		fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
+		return -1;
+	}
+	int tabCount = 1;
+	while (currentClassId != 0) {
+		ClassInfo * classInfo = classHashEntry->classInfo;
+		outputTabs(tabCount);
+		fprintf(stdout, "classobjectId:%lld\n", currentClassId);
+
+		//TODO read through instance field data
+		int numOfFields = classInfo->numInstanceFields;
+		for (int i = 0; i < numOfFields; i++) {
+			outputTabs(tabCount + 1);
+			fprintf(stdout, "instanceFieldNameIds:%lld\n", classInfo->instanceFieldNameIds[i]);
+			outputTabs(tabCount + 1);
+			fprintf(stdout, "type:%d\n", classInfo->typeOfFields[i]);
+			outputTabs(tabCount);
+			extractTypeFromStream(tagInfo, classInfo->typeOfFields[i], i, "processHeapInstanceDump");
+		}
+
+		currentClassId = classInfo->superClassObjId;
+		if (currentClassId != 0) {
+			HASH_FIND_LONG(classTable, &currentClassId, classHashEntry);
+			if (classHashEntry == NULL) {
+				fprintf(stderr, "Did not find class info for classid:%lld\n", currentClassId);
+				return -1;
+			}
+		}
+		tabCount++;
+	}
+
+	/*
+	errCode = iterateThroughStream(tagInfo->stream, numOfBytes);
+	if (errCode != 0) {
+		return errCode;
+	}
+	tagInfo->dataLength = tagInfo->dataLength - numOfBytes;
+	*/
+	return 0;
 }
 
 /*
@@ -779,7 +914,7 @@ int processHeapObjectArrayDump(TagInfo * tagInfo) {
 		- 2 * 4;
 
 	for (unsigned int i = 0; i < numOfElements; i++) {
-		errCode = processHeapPrimitiveArrayRecord(tagInfo, BASIC_TYPE_OBJECT, i, "HEAP_OBJECT_ARRAY_DUMP");
+		errCode = extractTypeFromStream(tagInfo, BASIC_TYPE_OBJECT, i, "HEAP_OBJECT_ARRAY_DUMP");
 		if (errCode != 0) {
 			return errCode;
 		}
@@ -834,7 +969,7 @@ int processHeapPrimitiveArrayDump(TagInfo * tagInfo) {
 		- 1 * 1;
 
 	for (unsigned int i = 0; i < numOfElements; i++) {
-		errCode = processHeapPrimitiveArrayRecord(tagInfo, typeOfEntry, i, "HEAP_PRIMITIVE_ARRAY_DUMP");
+		errCode = extractTypeFromStream(tagInfo, typeOfEntry, i, "HEAP_PRIMITIVE_ARRAY_DUMP");
 		if (errCode != 0) {
 			return errCode;
 		}
@@ -843,7 +978,19 @@ int processHeapPrimitiveArrayDump(TagInfo * tagInfo) {
 	return 0;
 }
 
-int processHeapPrimitiveArrayRecord(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source) {
+/*
+BASIC TYPES
+2 object
+4 boolean
+5 char
+6 float
+7 double
+8 byte
+9 short
+10 int
+11 long
+*/
+int extractTypeFromStream(TagInfo * tagInfo, unsigned int typeOfEntry, unsigned int entry, const char * source) {
 	unsigned int oneToFourByteValue;
 	unsigned long long eightByteValue;
 	int errCode;

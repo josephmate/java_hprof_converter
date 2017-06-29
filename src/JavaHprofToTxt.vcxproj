@@ -152,6 +152,7 @@
     <ClCompile Include="StreamUtil.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="lib\uthash.h" />
     <ClInclude Include="ProcessTagHeap.h" />
     <ClInclude Include="ProcessTags.h" />
     <ClInclude Include="StreamUtil.h" />

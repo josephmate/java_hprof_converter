@@ -7,10 +7,10 @@
 /* Contains all the info necessary for tag processing */
 struct TagInfo {
 	FILE * stream;
-	unsigned int dataLength;
+	long long dataLength;
 	int idSize;
 };
 typedef struct TagInfo TagInfo;
-TagInfo makeTagInfo(FILE * f, int dataLength, int idSize);
+TagInfo makeTagInfo(FILE * f, long long dataLength, int idSize);
 
 #endif
