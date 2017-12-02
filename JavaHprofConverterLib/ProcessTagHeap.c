@@ -1,7 +1,7 @@
 #include "ProcessTagHeap.h"
 #include "StreamUtil.h"
 #include <stdlib.h>
-#include "lib/uthash.h"
+#include "uthash.h"
 
 struct ClassInfo {
 	unsigned long long classId;
