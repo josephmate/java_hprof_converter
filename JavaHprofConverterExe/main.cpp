@@ -21,8 +21,8 @@ int main()
 {	
 	size_t numOfBytesRead;
 	FILE * f = stdin;
-	char buff[SIZE_OF_HEADER];
-	char * buffPointer = buff;
+	unsigned char buff[SIZE_OF_HEADER];
+	unsigned char * buffPointer = buff;
 
 #ifdef _WIN32
 	int result = _setmode(_fileno(stdin), _O_BINARY);

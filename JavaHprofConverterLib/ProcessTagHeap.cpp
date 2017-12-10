@@ -576,12 +576,12 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		fprintf(stderr, "Could not obtain numInstanceFields of HEAP_CLASS_DUMP\n");
 		return errCode;
 	}
-	ClassInfo * classInfo = malloc(sizeof(ClassInfo));
+	ClassInfo * classInfo = (ClassInfo *)malloc(sizeof(ClassInfo));
 	classInfo->classId = classObjId;
 	classInfo->superClassObjId = superClassObjId;
 	classInfo->numInstanceFields = numInstanceFields;
-	classInfo->instanceFieldNameIds = malloc(sizeof(long long)*numInstanceFields);
-	classInfo->typeOfFields = malloc(sizeof(unsigned int)*numInstanceFields);
+	classInfo->instanceFieldNameIds = (unsigned long long*)malloc(sizeof(unsigned long long)*numInstanceFields);
+	classInfo->typeOfFields = (unsigned int*)malloc(sizeof(unsigned int)*numInstanceFields);
 
 	// iterate over instance field records
 	for (unsigned int i = 0; i < numInstanceFields; i++) {
@@ -594,7 +594,7 @@ int processHeapClassDump(TagInfo * tagInfo) {
 		}
 	}
 
-	ClassHashEntry * classHashEntry = malloc(sizeof(ClassHashEntry));
+	ClassHashEntry * classHashEntry = (ClassHashEntry *)malloc(sizeof(ClassHashEntry));
 	classHashEntry->classId = classObjId;
 	classHashEntry->classInfo = classInfo;
 	HASH_ADD_LONG(classTable, classId, classHashEntry);

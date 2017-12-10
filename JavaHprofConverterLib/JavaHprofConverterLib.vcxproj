@@ -19,12 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ProcessTagHeap.c" />
-    <ClCompile Include="ProcessTags.c" />
-    <ClCompile Include="StreamUtil.c" />
-    <ClCompile Include="TagInfo.c" />
+    <ClCompile Include="ProcessTagHeap.cpp" />
+    <ClCompile Include="ProcessTags.cpp" />
+    <ClCompile Include="IOStreamReader.cpp" />
+    <ClCompile Include="StreamUtil.cpp" />
+    <ClCompile Include="TagInfo.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="IOStreamReader.hpp" />
+    <ClInclude Include="StreamReader.hpp" />
     <ClInclude Include="ProcessTagHeap.h" />
     <ClInclude Include="ProcessTags.h" />
     <ClInclude Include="StreamUtil.h" />

@@ -2,11 +2,13 @@
 #define TAG_INFO_H
 
 #include <stdio.h>
+#include "StreamReader.hpp"
 
 
 /* Contains all the info necessary for tag processing */
 struct TagInfo {
 	FILE * stream;
+	StreamReader * streamReader;
 	long long dataLength;
 	int idSize;
 };

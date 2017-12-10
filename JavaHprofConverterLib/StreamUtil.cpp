@@ -38,7 +38,7 @@ int readByteToInt(FILE * f, unsigned int * result) {
 }
 
 int readTwoByteBigEndianStreamToInt(FILE * f, unsigned int * result) {
-	char buff[2];
+	unsigned char buff[2];
 	size_t chunksRead = fread(buff, 2, 1, f);
 	if (chunksRead != 1) {
 		fprintf(stderr, "was unable to read a chunk of 2 bytes from the stream\n");
@@ -49,7 +49,7 @@ int readTwoByteBigEndianStreamToInt(FILE * f, unsigned int * result) {
 }
 
 int readBigEndianStreamToInt(FILE * f, unsigned int * result) {
-	char buff[4];
+	unsigned char buff[4];
 	size_t chunksRead = fread(buff, 4, 1, f);
 	if (chunksRead != 1) {
 		fprintf(stderr, "was unable to read a chunk of 4 bytes from the stream\n");
@@ -60,7 +60,7 @@ int readBigEndianStreamToInt(FILE * f, unsigned int * result) {
 }
 
 int readBigWordSmallWordBigEndianStreamToLong(FILE * f, unsigned long long * result) {
-	char buff[8];
+	unsigned char buff[8];
 	size_t chunksRead = fread(buff, 8, 1, f);
 	if (chunksRead != 1) {
 		fprintf(stderr, "was unable to read a chunk of 4 bytes from the stream\n");
@@ -93,7 +93,7 @@ int iterateThroughStream(FILE* f, long long dataLength) {
 }
 
 int getId(FILE * f, int idSize, unsigned long long * result) {
-	char buff[8];
+	unsigned char buff[8];
 	if (idSize == 4) {
 		fread(buff, 4, 1, f);
 		*result = fromBigEndianStreamToInt(buff);
